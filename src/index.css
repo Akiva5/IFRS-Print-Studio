@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Assistant', 'David Libre', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Assistant', monospace;
+  --font-serif: 'David Libre', 'David', 'Frank Ruhl Libre', 'Times New Roman', serif;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* Document & Print Typography */
+.font-david {
+  font-family: 'David Libre', 'David', 'Frank Ruhl Libre', 'Times New Roman', serif !important;
+}
+
+.num-cell {
+  direction: ltr !important;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: embed;
+}
+
+/* Accounting Table Specific Borders */
+.table-accounting thead th {
+  border-top: 1.2pt solid #000000;
+  border-bottom: 0.75pt solid #000000;
+}
+
+.table-accounting tr.unit-row td {
+  border-bottom: 0.75pt solid #000000;
+}
+
+.table-accounting tr.summary-row td {
+  border-top: 0.75pt solid #000000 !important;
+  border-bottom: 3px double #000000 !important;
+}
+
+.table-decision {
+  border: 0.5pt solid #000000;
+}
+
+.table-decision th,
+.table-decision td {
+  border: 0.5pt solid #000000;
+}
+
+/* Print Media Styles for Fallback window.print() */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only-target {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 18mm 20mm;
+  }
+}

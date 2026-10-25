@@ -1,0 +1,6 @@
+{
+  "name": "IFRS Print Studio",
+  "description": "מערכת סדר והפקת דפוס לתקינה חשבונאית בישראל בסגנון המוסד הישראלי לתקינה בחשבונאות",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
