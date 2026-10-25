@@ -4,6 +4,7 @@ import { MarkdownEditor } from './components/MarkdownEditor';
 import { DocumentPreview } from './components/DocumentPreview';
 import { SettingsModal } from './components/SettingsModal';
 import { InfoModal } from './components/InfoModal';
+import { SaveHtmlModal } from './components/SaveHtmlModal';
 import { DocumentSettings } from './types';
 import { autoCleanMarkdown } from './utils/markdownCleaner';
 import { parseDocument } from './utils/documentParser';
@@ -57,6 +58,7 @@ export default function App() {
   const [activeTabMobile, setActiveTabMobile] = useState<'editor' | 'preview'>('preview');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [isSaveHtmlOpen, setIsSaveHtmlOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Auto-save markdown to localStorage
@@ -77,11 +79,11 @@ export default function App() {
     }
   }, [settings]);
 
-  const showToast = useCallback((msg: string) => {
+  const showToast = useCallback((msg: string, duration = 3500) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage((curr) => (curr === msg ? null : curr));
-    }, 3500);
+    }, duration);
   }, []);
 
   // Parse document blocks
@@ -106,9 +108,9 @@ export default function App() {
     const cleaned = autoCleanMarkdown(markdown);
     if (cleaned !== markdown) {
       setMarkdown(cleaned);
-      showToast('הטקסט נוקה: הוסרו הקדמות AI והערות מתרגם, והומרו הטיות להדגשה.');
+      showToast('בוצע ניקוי: הוסרו משפטי פתיחה של AI, נמחקו הערות מתרגם והומרו הדגשות.', 4000);
     } else {
-      showToast('הטקסט כבר תקין ונקי לפי כללי התקינה.');
+      showToast('הטקסט כבר נקי ותקין – לא נמצאו תווים לתיקון.', 4000);
     }
   };
 
@@ -117,11 +119,15 @@ export default function App() {
     showToast('נטענה דוגמה רשמית של IFRS 8 מגזרי פעילות.');
   };
 
+  // 2-Step Clear handler without window.confirm (which gets blocked in iframe)
   const handleClear = () => {
-    if (window.confirm('האם למחוק את כל הטקסט בעורך?')) {
-      setMarkdown('');
-      showToast('העורך נוקה.');
+    setMarkdown('');
+    try {
+      localStorage.removeItem(STORAGE_KEY_MARKDOWN);
+    } catch {
+      // ignore
     }
+    showToast('העורך נוקה.', 3000);
   };
 
   // Dedicated Print Popup implementation
@@ -134,12 +140,8 @@ export default function App() {
     }
   };
 
-  const handlePrintFallback = () => {
-    window.print();
-  };
-
-  // Download Standalone HTML file
-  const handleDownloadHtml = () => {
+  // Download Standalone HTML file with user chosen filename
+  const handleDownloadWithFilename = (chosenFileName: string) => {
     const renderedHtml = renderDocumentToHtml(blocks, settings);
     const fullHtml = `<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -185,12 +187,12 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${documentTitle.replace(/[\/\\?%*:|"<>]/g, '_')}.html`;
+    link.download = chosenFileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast('קובץ ה-HTML הורד בהצלחה.');
+    showToast(`קובץ ה-HTML "${chosenFileName}" הורד בהצלחה.`);
   };
 
   return (
@@ -201,8 +203,7 @@ export default function App() {
           settings={settings}
           onUpdateSettings={handleUpdateSettings}
           onPrintPopup={handlePrintPopup}
-          onPrintFallback={handlePrintFallback}
-          onDownloadHtml={handleDownloadHtml}
+          onDownloadHtml={() => setIsSaveHtmlOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenInfo={() => setIsInfoOpen(true)}
         />
@@ -235,7 +236,6 @@ export default function App() {
       {/* Split-Screen Main Workspace (RTL: Column 1 is Right 42%, Column 2 is Left 58%) */}
       <main
         className="flex-1 grid grid-cols-1 md:grid-cols-[42%_58%] overflow-hidden"
-        style={{ gridTemplateColumns: undefined }}
         dir="rtl"
       >
         {/* Right Pane (Markdown Source Editor - 42% on the RIGHT) */}
@@ -250,7 +250,7 @@ export default function App() {
             onAutoClean={handleAutoClean}
             onLoadSample={handleLoadSample}
             onClear={handleClear}
-            onNotify={showToast}
+            onNotify={(msg) => showToast(msg, 4000)}
           />
         </section>
 
@@ -280,6 +280,14 @@ export default function App() {
       <InfoModal
         isOpen={isInfoOpen}
         onClose={() => setIsInfoOpen(false)}
+      />
+
+      {/* Save HTML Modal */}
+      <SaveHtmlModal
+        isOpen={isSaveHtmlOpen}
+        onClose={() => setIsSaveHtmlOpen(false)}
+        onSave={handleDownloadWithFilename}
+        defaultTitle={documentTitle}
       />
 
       {/* Toast Notification */}

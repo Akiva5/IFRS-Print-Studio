@@ -14,7 +14,6 @@ interface HeaderProps {
   settings: DocumentSettings;
   onUpdateSettings: (newSettings: Partial<DocumentSettings>) => void;
   onPrintPopup: () => void;
-  onPrintFallback: () => void;
   onDownloadHtml: () => void;
   onOpenSettings: () => void;
   onOpenInfo: () => void;
@@ -24,7 +23,6 @@ export const Header: React.FC<HeaderProps> = ({
   settings,
   onUpdateSettings,
   onPrintPopup,
-  onPrintFallback,
   onDownloadHtml,
   onOpenSettings,
   onOpenInfo,
@@ -113,21 +111,11 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Download Standalone HTML */}
           <button
             onClick={onDownloadHtml}
-            title="הורד קובץ HTML עצמאי להדפסה ללא תלות"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 text-xs transition"
+            title="הורד קובץ HTML עצמאי לעריכה ולהדפסה"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 text-xs transition"
           >
             <Download className="w-3.5 h-3.5 text-slate-400" />
             <span>שמור HTML</span>
-          </button>
-
-          {/* In-page direct fallback print */}
-          <button
-            onClick={onPrintFallback}
-            title="הדפסה מהירה בדף הנוכחי (גיבוי)"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 text-xs transition"
-          >
-            <FileText className="w-3.5 h-3.5 text-slate-400" />
-            <span>הדפסת דפדפן</span>
           </button>
 
           {/* Dedicated Print Popup Button - Primary Requirement */}

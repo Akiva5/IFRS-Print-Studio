@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Sparkles,
   Trash2,
@@ -9,7 +9,8 @@ import {
   BookOpen,
   Wand2,
   HelpCircle,
-  ClipboardPaste
+  ClipboardPaste,
+  X
 } from 'lucide-react';
 import { SAMPLE_IFRS8_MARKDOWN } from '../utils/sampleData';
 
@@ -34,7 +35,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [showTips, setShowTips] = useState(false);
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [showPasteNotice, setShowPasteNotice] = useState(false);
+  const clearTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Compute live stats
   const lineCount = value ? value.split('\n').length : 0;
@@ -49,6 +53,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         const text = await navigator.clipboard.readText();
         if (text) {
           onChange(text);
+          setShowPasteNotice(false);
           onNotify?.('הטקסט הודבק בהצלחה מלוח הגזירים.');
           return;
         }
@@ -58,12 +63,28 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     }
 
     // Graceful fallback for iframe permissions policy:
-    // Focus the textarea and select all text so user can immediately press Ctrl+V / Cmd+V
+    // Focus the textarea, select all text so user can immediately press Ctrl+V / Cmd+V,
+    // and show a prominent banner above the editor
+    setShowPasteNotice(true);
     if (textareaRef.current) {
       textareaRef.current.focus();
       textareaRef.current.select();
     }
-    onNotify?.('התיבה סומנה לפוקוס — לחץ Ctrl+V (או Cmd+V) להדבקת הטקסט.');
+    onNotify?.('התיבה מוכנה לקליטה – לחץ כעת Ctrl+V במקלדת להחלפת הטקסט');
+  };
+
+  const handleClearClick = () => {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = setTimeout(() => {
+        setConfirmClear(false);
+      }, 3000);
+    } else {
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+      setConfirmClear(false);
+      onClear();
+    }
   };
 
   const handleCopy = async () => {
@@ -74,10 +95,6 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     } catch {
       // fallback
     }
-  };
-
-  const insertSnippet = (snippet: string) => {
-    onChange(value ? `${value}\n\n${snippet}` : snippet);
   };
 
   return (
@@ -108,22 +125,28 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             <span>טען דוגמה (IFRS 8 IG)</span>
           </button>
 
+          {/* Upgraded Clean Button: ניקוי פלט AI */}
           <button
             onClick={onAutoClean}
-            title="הסרת שורות פתיחה של AI, מחיקת הערות מתרגם, והמרת כל ההטיות להדגשה תקנית"
+            title="מסיר משפטי פתיחה של המודל, מוחק הערות מתרגם, וממיר כתב נטוי (*) להדגשה (**)"
             className="flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition font-medium"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Auto-Clean Markdown</span>
+            <span>ניקוי פלט AI</span>
           </button>
 
+          {/* 2-Step Clear Button */}
           <button
-            onClick={onClear}
-            title="נקה את כל הטקסט בעורך"
-            className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800/80 hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-800/50 text-slate-400 border border-slate-700 transition"
+            onClick={handleClearClick}
+            title={confirmClear ? "לחץ שוב כדי למחוק את כל הטקסט" : "נקה את כל הטקסט בעורך"}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded transition font-medium ${
+              confirmClear
+                ? 'bg-rose-600 hover:bg-rose-500 text-white border border-rose-500 shadow-md animate-pulse'
+                : 'bg-slate-800/80 hover:bg-rose-950/40 hover:text-rose-300 hover:border-rose-800/50 text-slate-400 border border-slate-700'
+            }`}
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>נקה</span>
+            <span>{confirmClear ? 'לחץ שוב לאישור' : 'נקה'}</span>
           </button>
         </div>
 
@@ -161,6 +184,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         </div>
       </div>
 
+      {/* Prominent Banner when clipboard API was blocked: informs user to press Ctrl+V */}
+      {showPasteNotice && (
+        <div className="m-2 p-2.5 bg-amber-500/15 border border-amber-500/40 text-amber-200 rounded-lg text-xs flex items-center justify-between animate-in fade-in slide-in-from-top-1 duration-150 shadow-md">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <span className="font-semibold text-amber-200">
+              התיבה מוכנה לקליטה – לחץ כעת Ctrl+V במקלדת להחלפת הטקסט
+            </span>
+          </div>
+          <button
+            onClick={() => setShowPasteNotice(false)}
+            className="text-amber-300 hover:text-white p-0.5 rounded transition"
+            title="סגור הודעה"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Syntax Helper Drawer (Collapsible) */}
       {showTips && (
         <div className="bg-slate-950/90 border-b border-slate-800 p-3 text-xs text-slate-300 grid grid-cols-1 md:grid-cols-2 gap-3 animate-in fade-in duration-150">
@@ -171,17 +213,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             <ul className="space-y-1 text-slate-400 text-[11px] list-disc list-inside">
               <li>
                 סעיף תלוי: פתח שורה ב-{' '}
-                <code className="text-amber-300 font-mono">**IG1**</code> או{' '}
-                <code className="text-amber-300 font-mono">**IE1**</code>.
+                <code className="text-amber-300 font-david font-bold">**IG1**</code> או{' '}
+                <code className="text-amber-300 font-david font-bold">**IE1**</code>.
               </li>
               <li>
                 כותרת ראשית ממסגרת:{' '}
-                <code className="text-amber-300 font-mono"># שם התקן</code>.
+                <code className="text-amber-300 font-david font-bold"># שם התקן</code>.
               </li>
               <li>
                 הערות שוליים לטבלה: פתח שורה ב-{' '}
-                <code className="text-amber-300 font-mono">(א)</code> או{' '}
-                <code className="text-amber-300 font-mono">(ב)</code> ישירות תחת הטבלה.
+                <code className="text-amber-300 font-david font-bold">(א)</code> או{' '}
+                <code className="text-amber-300 font-david font-bold">(ב)</code> ישירות תחת הטבלה.
               </li>
             </ul>
           </div>
@@ -192,18 +234,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             <ul className="space-y-1 text-slate-400 text-[11px] list-disc list-inside">
               <li>
                 שורת יחידת מטבע:{' '}
-                <code className="text-amber-300 font-mono">| | י&quot;מ | י&quot;מ |</code>{' '}
+                <code className="text-amber-300 font-david font-bold">| | י&quot;מ | י&quot;מ |</code>{' '}
                 (תא ראשון ריק).
               </li>
               <li>
                 שורת סיכום / קו תחתון כפול:{' '}
-                <code className="text-amber-300 font-mono">סך הכול</code> או{' '}
-                <code className="text-amber-300 font-mono">סה&quot;כ</code>.
+                <code className="text-amber-300 font-david font-bold">סך הכול</code> או{' '}
+                <code className="text-amber-300 font-david font-bold">סה&quot;כ</code>.
               </li>
               <li>
                 תרשים זרימה ובדיקות: הוסף בעמודות{' '}
-                <code className="text-amber-300 font-mono">שלב ובדיקה</code> ו-
-                <code className="text-amber-300 font-mono">אם כן</code>.
+                <code className="text-amber-300 font-david font-bold">שלב ובדיקה</code> ו-
+                <code className="text-amber-300 font-david font-bold">אם כן</code>.
               </li>
             </ul>
           </div>
@@ -216,6 +258,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onPaste={() => setShowPasteNotice(false)}
           placeholder={`הדבק כאן את פלט ה-Markdown של תרגום התקן...
 
 דוגמה מהירה:

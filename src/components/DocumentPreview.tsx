@@ -1,10 +1,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
   Eye,
-  Columns,
-  Maximize2,
-  Minimize2,
-  FileText
+  Columns
 } from 'lucide-react';
 import { DocumentBlock, DocumentSettings, ParsedTable, TableRow } from '../types';
 import { paginateBlocks } from '../utils/paginator';
@@ -15,10 +12,7 @@ interface DocumentPreviewProps {
   rawMarkdown: string;
 }
 
-type ZoomMode = 'fit-width' | 'fit-page' | '100';
-
-const A4_WIDTH_PX = 794; // approx 210mm at 96 DPI
-const A4_HEIGHT_PX = 1123; // approx 297mm at 96 DPI
+type ZoomMode = 'fit-width' | 'fit-page' | '100' | 'manual';
 
 export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   blocks,
@@ -27,6 +21,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 }) => {
   // Zoom mode state: default to 'fit-width' (התאמה לרוחב) on initial load!
   const [zoomMode, setZoomMode] = useState<ZoomMode>('fit-width');
+  const [customScale, setCustomScale] = useState<number | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -67,24 +62,38 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   // Compute scale based on zoomMode and measured container dimensions
   const scale = useMemo(() => {
     if (zoomMode === '100') return 1.0;
+    if (zoomMode === 'manual' && customScale !== null) return customScale;
 
-    const availableWidth = Math.max(100, containerSize.width - 48);
-    const availableHeight = Math.max(100, containerSize.height - 48);
+    const containerWidth = containerSize.width || 800;
+    const containerHeight = containerSize.height || 900;
 
     if (zoomMode === 'fit-width') {
-      if (containerSize.width === 0) return 0.85; // Initial render fallback
-      return Math.max(0.35, availableWidth / A4_WIDTH_PX);
+      // Calculate fitWidthScale so A4 (794px) fills ~95% of container width without clipping
+      const fitWidthScale = Math.max(0.4, Math.floor(((containerWidth - 32) / 794) * 100) / 100);
+      return fitWidthScale;
     }
 
     if (zoomMode === 'fit-page') {
-      if (containerSize.width === 0 || containerSize.height === 0) return 0.65;
-      const scaleW = availableWidth / A4_WIDTH_PX;
-      const scaleH = availableHeight / A4_HEIGHT_PX;
-      return Math.max(0.35, Math.min(scaleW, scaleH));
+      const scaleW = (containerWidth - 32) / 794;
+      const scaleH = (containerHeight - 32) / 1123;
+      const fitPageScale = Math.max(0.35, Math.floor(Math.min(scaleW, scaleH) * 100) / 100);
+      return fitPageScale;
     }
 
     return 1.0;
-  }, [zoomMode, containerSize]);
+  }, [zoomMode, customScale, containerSize]);
+
+  const handleZoomMinus = () => {
+    const nextVal = Math.max(0.3, Math.round((scale - 0.1) * 10) / 10);
+    setCustomScale(nextVal);
+    setZoomMode('manual');
+  };
+
+  const handleZoomPlus = () => {
+    const nextVal = Math.min(2.0, Math.round((scale + 0.1) * 10) / 10);
+    setCustomScale(nextVal);
+    setZoomMode('manual');
+  };
 
   const isEmpty = blocks.length === 0;
 
@@ -102,11 +111,14 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           </span>
         </div>
 
-        {/* 3 Zoom Mode Controls: התאמה לרוחב (ברירת מחדל), התאמה לאורך, 100% */}
+        {/* Zoom Controls: Fit Width, Fit Page, 100%, and - / + Steppers */}
         <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
           <button
-            onClick={() => setZoomMode('fit-width')}
-            title="התאמת רוחב הדף לחלון התצוגה (מונע חיתוך)"
+            onClick={() => {
+              setZoomMode('fit-width');
+              setCustomScale(null);
+            }}
+            title="התאמת רוחב הדף לחלון התצוגה (ממלא כ-95% מהרוחב)"
             className={`px-2.5 py-1 rounded transition font-medium ${
               zoomMode === 'fit-width'
                 ? 'bg-amber-500 text-slate-950 shadow-sm font-semibold'
@@ -117,7 +129,10 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           </button>
 
           <button
-            onClick={() => setZoomMode('fit-page')}
+            onClick={() => {
+              setZoomMode('fit-page');
+              setCustomScale(null);
+            }}
             title="התאמת עמוד שלם לאורך החלון"
             className={`px-2.5 py-1 rounded transition font-medium ${
               zoomMode === 'fit-page'
@@ -129,7 +144,10 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           </button>
 
           <button
-            onClick={() => setZoomMode('100')}
+            onClick={() => {
+              setZoomMode('100');
+              setCustomScale(1.0);
+            }}
             title="הצגה בגודל מקורי 100%"
             className={`px-2.5 py-1 rounded transition font-medium ${
               zoomMode === '100'
@@ -140,13 +158,30 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             100%
           </button>
 
-          <span className="text-[11px] font-mono text-slate-400 px-1 border-r border-slate-800">
-            {Math.round(scale * 100)}%
-          </span>
+          {/* Stepper buttons: - and + with percentage badge in the middle */}
+          <div className="flex items-center gap-1 border-r border-slate-800 pr-1 mr-1">
+            <button
+              onClick={handleZoomMinus}
+              title="הקטן תצוגה ב-10%"
+              className="w-6 h-6 flex items-center justify-center rounded bg-slate-850 hover:bg-slate-800 text-slate-200 hover:text-amber-400 transition font-bold text-sm"
+            >
+              -
+            </button>
+            <span className="text-[11px] font-mono text-amber-400 font-medium px-1 min-w-[42px] text-center select-none">
+              {Math.round(scale * 100)}%
+            </span>
+            <button
+              onClick={handleZoomPlus}
+              title="הגדל תצוגה ב-10%"
+              className="w-6 h-6 flex items-center justify-center rounded bg-slate-850 hover:bg-slate-800 text-slate-200 hover:text-amber-400 transition font-bold text-sm"
+            >
+              +
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Workspace Canvas */}
+      {/* Workspace Canvas with zoom: scale applied directly */}
       <div
         ref={containerRef}
         className="flex-1 overflow-auto p-4 md:p-6 flex flex-col items-center bg-slate-950/80"
@@ -165,86 +200,76 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         ) : (
           <div
             style={{
-              width: `${A4_WIDTH_PX * scale}px`,
+              zoom: scale,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              transition: 'width 0.15s ease-out',
             }}
             className="mx-auto print-only-target"
           >
-            <div
-              style={{
-                width: '210mm',
-                transform: `scale(${scale})`,
-                transformOrigin: 'top center',
-                transition: 'transform 0.15s ease-out',
-              }}
-            >
-              {/* Render each separate A4 Page with Running Header and Running Footer */}
-              {pages.map((pageBlocks, pageIdx) => (
-                <div
-                  key={pageIdx}
-                  className="bg-white text-black font-david relative flex flex-col"
-                  style={{
-                    width: '210mm',
-                    minHeight: '297mm',
-                    paddingTop: `${settings.marginMm}mm`,
-                    paddingBottom: `${settings.marginMm}mm`,
-                    paddingRight: '20mm',
-                    paddingLeft: '20mm',
-                    boxSizing: 'border-box',
-                    fontSize: `${settings.fontSizePt}pt`,
-                    lineHeight: settings.lineHeight,
-                    marginBottom: '28px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.22)',
-                    border: '1px solid #94a3b8',
-                  }}
-                  dir="rtl"
-                >
-                  {/* Optional Margins Guide Overlay */}
-                  {settings.showPageGuides && (
-                    <div
-                      className="pointer-events-none absolute inset-0 border border-dashed border-sky-300/40"
-                      style={{
-                        top: `${settings.marginMm}mm`,
-                        bottom: `${settings.marginMm}mm`,
-                        right: '20mm',
-                        left: '20mm',
-                      }}
-                    />
-                  )}
+            {/* Render each separate A4 Page with Running Header and Running Footer */}
+            {pages.map((pageBlocks, pageIdx) => (
+              <div
+                key={pageIdx}
+                className="bg-white text-black font-david relative flex flex-col"
+                style={{
+                  width: '210mm',
+                  minHeight: '297mm',
+                  paddingTop: `${settings.marginMm}mm`,
+                  paddingBottom: `${settings.marginMm}mm`,
+                  paddingRight: '20mm',
+                  paddingLeft: '20mm',
+                  boxSizing: 'border-box',
+                  fontSize: `${settings.fontSizePt}pt`,
+                  lineHeight: settings.lineHeight,
+                  marginBottom: '28px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.22)',
+                  border: '1px solid #94a3b8',
+                }}
+                dir="rtl"
+              >
+                {/* Optional Margins Guide Overlay */}
+                {settings.showPageGuides && (
+                  <div
+                    className="pointer-events-none absolute inset-0 border border-dashed border-sky-300/40"
+                    style={{
+                      top: `${settings.marginMm}mm`,
+                      bottom: `${settings.marginMm}mm`,
+                      right: '20mm',
+                      left: '20mm',
+                    }}
+                  />
+                )}
 
-                  {/* Running Header on every page */}
-                  {(settings.runningHeaderRight || settings.runningHeaderLeft) && (
-                    <div className="flex justify-between items-center border-b border-black pb-1 mb-4 text-[9.5pt] select-none shrink-0">
-                      <div className="font-medium text-black">
-                        {settings.runningHeaderRight}
-                      </div>
-                      <div className="font-normal text-black font-david">
-                        {settings.runningHeaderLeft}
-                      </div>
+                {/* Running Header on every page */}
+                {(settings.runningHeaderRight || settings.runningHeaderLeft) && (
+                  <div className="flex justify-between items-center border-b border-black pb-1 mb-4 text-[9.5pt] select-none shrink-0">
+                    <div className="font-medium text-black">
+                      {settings.runningHeaderRight}
                     </div>
-                  )}
-
-                  {/* Page Blocks Content */}
-                  <div className="flex-1 space-y-2.5">
-                    {pageBlocks.map((block, bIdx) => (
-                      <BlockRenderer
-                        key={bIdx}
-                        block={block}
-                        settings={settings}
-                      />
-                    ))}
+                    <div className="font-normal text-black font-david">
+                      {settings.runningHeaderLeft}
+                    </div>
                   </div>
+                )}
 
-                  {/* Running Footer on every page */}
-                  <div className="mt-auto pt-2 border-t border-black text-[9pt] flex justify-center items-center select-none shrink-0 text-black">
-                    <span>עמוד {pageIdx + 1} מתוך {pages.length}</span>
-                  </div>
+                {/* Page Blocks Content */}
+                <div className="flex-1 space-y-2.5">
+                  {pageBlocks.map((block, bIdx) => (
+                    <BlockRenderer
+                      key={bIdx}
+                      block={block}
+                      settings={settings}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+
+                {/* Running Footer on every page */}
+                <div className="mt-auto pt-2 border-t border-black text-[9pt] flex justify-center items-center select-none shrink-0 text-black">
+                  <span>עמוד {pageIdx + 1} מתוך {pages.length}</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
