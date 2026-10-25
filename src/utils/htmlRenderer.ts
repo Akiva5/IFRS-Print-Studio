@@ -1,4 +1,5 @@
 import { DocumentBlock, DocumentSettings, ParsedTable, TableRow } from '../types';
+import { paginateBlocks } from './paginator';
 
 /**
  * Formats inline markdown formatting:
@@ -79,69 +80,77 @@ export function renderTableToHtml(table: ParsedTable): string {
   return html;
 }
 
+function renderSingleBlock(block: DocumentBlock, settings: DocumentSettings): string {
+  switch (block.type) {
+    case 'h1':
+      return `<h1 class="standard-title" id="${block.id}">${formatInlineText(block.text)}</h1>\n`;
+
+    case 'h2':
+      return `<h2 class="section-h2" id="${block.id}">${formatInlineText(block.text)}</h2>\n`;
+
+    case 'h3':
+      return `<h3 class="section-h3" id="${block.id}">${formatInlineText(block.text)}</h3>\n`;
+
+    case 'hanging_paragraph':
+      if (settings.hangingIndent) {
+        return `<div class="hanging-grid">\n  <div class="hanging-code">${formatInlineText(block.code)}</div>\n  <div class="hanging-body">${formatInlineText(block.body)}</div>\n</div>\n`;
+      }
+      return `<p class="standard-paragraph"><strong>${formatInlineText(block.code)}</strong> ${formatInlineText(block.body)}</p>\n`;
+
+    case 'paragraph':
+      return `<p class="standard-paragraph">${formatInlineText(block.text)}</p>\n`;
+
+    case 'table':
+      return renderTableToHtml(block.table);
+
+    case 'footnote':
+      return `<div class="table-footnote">\n  <span class="footnote-marker">${formatInlineText(block.marker)}</span>\n  <span class="footnote-text">${formatInlineText(block.text)}</span>\n</div>\n`;
+
+    case 'quote':
+      return `<blockquote class="ifrs-quote">${formatInlineText(block.text)}</blockquote>\n`;
+
+    case 'hr':
+      return `<hr class="ifrs-divider" />\n`;
+  }
+}
+
 /**
- * Renders document blocks into complete IFRS formatted HTML for printing and preview.
+ * Renders document blocks into complete IFRS formatted HTML for printing and preview,
+ * paginated into individual A4 sheets with running headers and running footers.
  */
 export function renderDocumentToHtml(blocks: DocumentBlock[], settings: DocumentSettings): string {
+  const pages = paginateBlocks(blocks, settings);
+  if (pages.length === 0) return '';
+
   let html = '';
 
-  // 1. Running Header
-  if (settings.runningHeaderRight || settings.runningHeaderLeft) {
-    html += `<div class="running-header">\n`;
-    html += `  <div class="running-header-right">${formatInlineText(settings.runningHeaderRight)}</div>\n`;
-    html += `  <div class="running-header-left">${formatInlineText(settings.runningHeaderLeft)}</div>\n`;
-    html += `</div>\n`;
-  }
+  pages.forEach((pageBlocks, pageIdx) => {
+    const isLast = pageIdx === pages.length - 1;
+    const breakStyle = isLast ? 'page-break-after: auto; break-after: auto;' : 'page-break-after: always; break-after: page;';
 
-  // 2. Blocks
-  blocks.forEach((block) => {
-    switch (block.type) {
-      case 'h1':
-        html += `<h1 class="standard-title" id="${block.id}">${formatInlineText(block.text)}</h1>\n`;
-        break;
+    html += `<div class="a4-page" style="${breakStyle} min-height: 297mm; display: flex; flex-direction: column; padding: ${settings.marginMm}mm 20mm; box-sizing: border-box;">\n`;
 
-      case 'h2':
-        html += `<h2 class="section-h2" id="${block.id}">${formatInlineText(block.text)}</h2>\n`;
-        break;
-
-      case 'h3':
-        html += `<h3 class="section-h3" id="${block.id}">${formatInlineText(block.text)}</h3>\n`;
-        break;
-
-      case 'hanging_paragraph':
-        if (settings.hangingIndent) {
-          html += `<div class="hanging-grid">\n`;
-          html += `  <div class="hanging-code">${formatInlineText(block.code)}</div>\n`;
-          html += `  <div class="hanging-body">${formatInlineText(block.body)}</div>\n`;
-          html += `</div>\n`;
-        } else {
-          html += `<p class="standard-paragraph"><strong>${formatInlineText(block.code)}</strong> ${formatInlineText(block.body)}</p>\n`;
-        }
-        break;
-
-      case 'paragraph':
-        html += `<p class="standard-paragraph">${formatInlineText(block.text)}</p>\n`;
-        break;
-
-      case 'table':
-        html += renderTableToHtml(block.table);
-        break;
-
-      case 'footnote':
-        html += `<div class="table-footnote">\n`;
-        html += `  <span class="footnote-marker">${formatInlineText(block.marker)}</span>\n`;
-        html += `  <span class="footnote-text">${formatInlineText(block.text)}</span>\n`;
-        html += `</div>\n`;
-        break;
-
-      case 'quote':
-        html += `<blockquote class="ifrs-quote">${formatInlineText(block.text)}</blockquote>\n`;
-        break;
-
-      case 'hr':
-        html += `<hr class="ifrs-divider" />\n`;
-        break;
+    // 1. Running Header on each page
+    if (settings.runningHeaderRight || settings.runningHeaderLeft) {
+      html += `  <div class="running-header">\n`;
+      html += `    <div class="running-header-right">${formatInlineText(settings.runningHeaderRight)}</div>\n`;
+      html += `    <div class="running-header-left">${formatInlineText(settings.runningHeaderLeft)}</div>\n`;
+      html += `  </div>\n`;
     }
+
+    // 2. Page Content
+    html += `  <div class="page-content" style="flex: 1 0 auto;">\n`;
+    pageBlocks.forEach((block) => {
+      html += '    ' + renderSingleBlock(block, settings);
+    });
+    html += `  </div>\n`;
+
+    // 3. Running Footer on each page
+    html += `  <div class="running-footer" style="margin-top: auto; padding-top: 3pt; border-top: 0.75pt solid #000; font-size: 9pt; text-align: center; color: #000; display: flex; justify-content: center; align-items: center;">\n`;
+    html += `    <span>עמוד ${pageIdx + 1} מתוך ${pages.length}</span>\n`;
+    html += `  </div>\n`;
+
+    html += `</div>\n`;
   });
 
   return html;

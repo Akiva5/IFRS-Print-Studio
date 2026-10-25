@@ -49,6 +49,28 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       margin: 0 auto;
     }
 
+    .print-page {
+      width: 100%;
+      box-sizing: border-box;
+      padding: ${settings.marginMm}mm 20mm;
+      min-height: 297mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-after: always;
+      break-after: page;
+      background: #ffffff;
+    }
+
+    .print-page:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    .page-content {
+      flex: 1;
+    }
+
     /* Running Header */
     .running-header {
       display: flex;
@@ -56,7 +78,7 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       align-items: center;
       border-bottom: 0.75pt solid #000000;
       padding-bottom: 3pt;
-      margin-bottom: 16pt;
+      margin-bottom: 14pt;
       font-size: 9pt;
       color: #000000;
     }
@@ -68,6 +90,22 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
     .running-header-left {
       font-weight: 400;
       direction: ltr;
+    }
+
+    /* Running Footer */
+    .running-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 0.75pt solid #000000;
+      padding-top: 3pt;
+      margin-top: 14pt;
+      font-size: 8.5pt;
+      color: #000000;
+    }
+
+    .running-footer-center {
+      font-weight: bold;
     }
 
     /* Standard h1 framed title */

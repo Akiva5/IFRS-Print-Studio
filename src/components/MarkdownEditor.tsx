@@ -8,7 +8,8 @@ import {
   RotateCcw,
   BookOpen,
   Wand2,
-  HelpCircle
+  HelpCircle,
+  ClipboardPaste
 } from 'lucide-react';
 import { SAMPLE_IFRS8_MARKDOWN } from '../utils/sampleData';
 
@@ -38,6 +39,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const charCount = value.length;
   const tableCount = (value.match(/^\|(?:\s*:?-+:?\s*\|)+\s*$/gm) || []).length;
 
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        onChange(text);
+      }
+    } catch (err) {
+      console.error('Failed to read clipboard:', err);
+    }
+  };
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(value);
@@ -61,6 +73,15 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           <span className="text-slate-300 font-semibold px-1">
             טקסט מקור (Markdown)
           </span>
+
+          <button
+            onClick={handlePaste}
+            title="הדבק טקסט מלוח הגזירים (מחליף את התוכן הקיים בתיבה)"
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+          >
+            <ClipboardPaste className="w-3.5 h-3.5 text-amber-400" />
+            <span>הדבק</span>
+          </button>
 
           <button
             onClick={() => onLoadSample(SAMPLE_IFRS8_MARKDOWN)}

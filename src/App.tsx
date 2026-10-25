@@ -12,7 +12,7 @@ import { printViaPopup } from './utils/printHelper';
 import { SAMPLE_IFRS8_MARKDOWN } from './utils/sampleData';
 import { CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 
-const STORAGE_KEY_MARKDOWN = 'ifrs_markdown_content_v2';
+const STORAGE_KEY_MARKDOWN = 'ifrs_markdown_content_v3';
 const STORAGE_KEY_SETTINGS = 'ifrs_settings_v2';
 
 const DEFAULT_SETTINGS: DocumentSettings = {
@@ -231,24 +231,15 @@ export default function App() {
         </button>
       </div>
 
-      {/* Split-Screen Main Workspace */}
-      <main className="flex-1 flex overflow-hidden">
-        {/* Left Pane (Live A4 Preview) */}
+      {/* Split-Screen Main Workspace (RTL: Column 1 is Right 42%, Column 2 is Left 58%) */}
+      <main
+        className="flex-1 grid grid-cols-1 md:grid-cols-[42%_58%] overflow-hidden"
+        style={{ gridTemplateColumns: undefined }}
+        dir="rtl"
+      >
+        {/* Right Pane (Markdown Source Editor - 42% on the RIGHT) */}
         <section
-          className={`w-full md:w-1/2 h-full ${
-            activeTabMobile === 'preview' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
-          }`}
-        >
-          <DocumentPreview
-            blocks={blocks}
-            settings={settings}
-            rawMarkdown={markdown}
-          />
-        </section>
-
-        {/* Right Pane (Markdown Source Editor) */}
-        <section
-          className={`w-full md:w-1/2 h-full ${
+          className={`w-full h-full overflow-hidden ${
             activeTabMobile === 'editor' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
           }`}
         >
@@ -258,6 +249,19 @@ export default function App() {
             onAutoClean={handleAutoClean}
             onLoadSample={handleLoadSample}
             onClear={handleClear}
+          />
+        </section>
+
+        {/* Left Pane (Live A4 Preview - 58% on the LEFT) */}
+        <section
+          className={`w-full h-full overflow-hidden border-r border-slate-800 ${
+            activeTabMobile === 'preview' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
+          }`}
+        >
+          <DocumentPreview
+            blocks={blocks}
+            settings={settings}
+            rawMarkdown={markdown}
           />
         </section>
       </main>

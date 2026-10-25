@@ -7,6 +7,9 @@ import { DocumentSettings } from '../types';
 const testSettings: DocumentSettings = {
   runningHeaderRight: 'IFRS 8 - דוגמאות להמחשה',
   runningHeaderLeft: 'תקינה חשבונאית בינלאומית (IFRS)',
+  runningFooterRight: 'המוסד הישראלי לתקינה',
+  runningFooterLeft: 'IFRS',
+  showPageNumbers: true,
   hangingIndent: true,
   fontSizePt: 11.5,
   lineHeight: 1.48,
@@ -34,4 +37,6 @@ test('renderDocumentToHtml renders running header, h1 title, hanging grid and ac
   assert.ok(html.includes('class="hanging-code"'));
   assert.ok(html.includes('class="summary-row"'));
   assert.ok(html.includes('class="table-footnote"'));
+  assert.ok(html.includes('class="running-footer"'));
+  assert.ok(html.includes('עמוד 1 מתוך 1'));
 });

@@ -71,6 +71,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            {/* Running Footer Right */}
+            <div>
+              <label className="block font-medium text-slate-300 mb-1">
+                כותרת תחתונה (צד ימין):
+              </label>
+              <input
+                type="text"
+                value={settings.runningFooterRight}
+                onChange={(e) => onUpdateSettings({ runningFooterRight: e.target.value })}
+                placeholder="המוסד הישראלי לתקינה בחשבונאות"
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded text-slate-200 focus:outline-none focus:border-amber-500 text-xs"
+              />
+            </div>
+
+            {/* Running Footer Left */}
+            <div>
+              <label className="block font-medium text-slate-300 mb-1">
+                כותרת תחתונה (צד שמאל):
+              </label>
+              <input
+                type="text"
+                value={settings.runningFooterLeft}
+                onChange={(e) => onUpdateSettings({ runningFooterLeft: e.target.value })}
+                placeholder="IFRS"
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded text-slate-200 focus:outline-none focus:border-amber-500 text-xs"
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4 pt-2">
             {/* Font Size */}
             <div>
@@ -142,6 +172,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Toggles */}
           <div className="pt-2 space-y-2 border-t border-slate-800">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={settings.showPageNumbers}
+                onChange={(e) => onUpdateSettings({ showPageNumbers: e.target.checked })}
+                className="rounded border-slate-700 text-amber-500 focus:ring-amber-500"
+              />
+              <span className="text-slate-200">
+                הצג כותרת תחתונה ומספרי עמודים (עמוד X מתוך Y) בכל העמודים
+              </span>
+            </label>
+
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
