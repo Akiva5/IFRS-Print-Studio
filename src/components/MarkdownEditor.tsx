@@ -20,6 +20,7 @@ interface MarkdownEditorProps {
   onLoadSample: (sample: string) => void;
   onClear: () => void;
   hasAutoCleanNotice?: boolean;
+  onNotify?: (msg: string) => void;
 }
 
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -29,9 +30,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   onLoadSample,
   onClear,
   hasAutoCleanNotice,
+  onNotify,
 }) => {
   const [copied, setCopied] = useState(false);
   const [showTips, setShowTips] = useState(false);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Compute live stats
   const lineCount = value ? value.split('\n').length : 0;
@@ -40,14 +43,27 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const tableCount = (value.match(/^\|(?:\s*:?-+:?\s*\|)+\s*$/gm) || []).length;
 
   const handlePaste = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        onChange(text);
+    // Attempt navigator.clipboard.readText() if supported and permitted
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          onChange(text);
+          onNotify?.('הטקסט הודבק בהצלחה מלוח הגזירים.');
+          return;
+        }
+      } catch {
+        // Permissions policy blocked readText (standard in sandboxed iframes)
       }
-    } catch (err) {
-      console.error('Failed to read clipboard:', err);
     }
+
+    // Graceful fallback for iframe permissions policy:
+    // Focus the textarea and select all text so user can immediately press Ctrl+V / Cmd+V
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
+    }
+    onNotify?.('התיבה סומנה לפוקוס — לחץ Ctrl+V (או Cmd+V) להדבקת הטקסט.');
   };
 
   const handleCopy = async () => {
@@ -197,6 +213,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       {/* Main Textarea */}
       <div className="relative flex-1 p-2">
         <textarea
+          ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={`הדבק כאן את פלט ה-Markdown של תרגום התקן...

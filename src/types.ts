@@ -1,9 +1,9 @@
 export interface DocumentSettings {
   runningHeaderRight: string;
   runningHeaderLeft: string;
-  runningFooterRight: string;
-  runningFooterLeft: string;
-  showPageNumbers: boolean;
+  runningFooterRight?: string;
+  runningFooterLeft?: string;
+  showPageNumbers?: boolean;
   hangingIndent: boolean;
   fontSizePt: number;
   lineHeight: number;

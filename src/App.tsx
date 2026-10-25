@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS: DocumentSettings = {
   lineHeight: 1.48,
   marginMm: 18,
   showPageGuides: false,
+  showPageNumbers: true,
   paperSize: 'A4',
 };
 
@@ -249,6 +250,7 @@ export default function App() {
             onAutoClean={handleAutoClean}
             onLoadSample={handleLoadSample}
             onClear={handleClear}
+            onNotify={showToast}
           />
         </section>
 
