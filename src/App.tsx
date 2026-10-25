@@ -11,7 +11,7 @@ import { parseDocument } from './utils/documentParser';
 import { renderDocumentToHtml } from './utils/htmlRenderer';
 import { printViaPopup } from './utils/printHelper';
 import { SAMPLE_IFRS8_MARKDOWN } from './utils/sampleData';
-import { CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 const STORAGE_KEY_MARKDOWN = 'ifrs_markdown_content_v3';
 const STORAGE_KEY_SETTINGS = 'ifrs_settings_v2';
@@ -29,8 +29,8 @@ const DEFAULT_SETTINGS: DocumentSettings = {
 };
 
 export default function App() {
-  // Load initial markdown from localStorage or use sample
-  const [markdown, setMarkdown] = useState<string>(() => {
+  // Editor text state (what the user types)
+  const [editorMarkdown, setEditorMarkdown] = useState<string>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_MARKDOWN);
       if (saved !== null && saved !== undefined) {
@@ -41,6 +41,12 @@ export default function App() {
     }
     return SAMPLE_IFRS8_MARKDOWN;
   });
+
+  // Preview text state (controlled update so typing doesn't flicker/jump preview)
+  const [previewMarkdown, setPreviewMarkdown] = useState<string>(editorMarkdown);
+  const [autoSync, setAutoSync] = useState<boolean>(false);
+
+  const hasPendingChanges = editorMarkdown !== previewMarkdown;
 
   // Load initial settings
   const [settings, setSettings] = useState<DocumentSettings>(() => {
@@ -61,14 +67,23 @@ export default function App() {
   const [isSaveHtmlOpen, setIsSaveHtmlOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Auto-save markdown to localStorage
+  // Auto-save editor markdown to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_MARKDOWN, markdown);
+      localStorage.setItem(STORAGE_KEY_MARKDOWN, editorMarkdown);
     } catch {
       // ignore
     }
-  }, [markdown]);
+  }, [editorMarkdown]);
+
+  // When autoSync is enabled, debounce sync editorMarkdown to previewMarkdown
+  useEffect(() => {
+    if (!autoSync) return;
+    const timer = setTimeout(() => {
+      setPreviewMarkdown(editorMarkdown);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [editorMarkdown, autoSync]);
 
   // Auto-save settings to localStorage
   useEffect(() => {
@@ -86,10 +101,10 @@ export default function App() {
     }, duration);
   }, []);
 
-  // Parse document blocks
+  // Parse document blocks from committed previewMarkdown
   const blocks = useMemo(() => {
-    return parseDocument(markdown);
-  }, [markdown]);
+    return parseDocument(previewMarkdown);
+  }, [previewMarkdown]);
 
   // Extract document title from first h1 block if available
   const documentTitle = useMemo(() => {
@@ -104,10 +119,17 @@ export default function App() {
     setSettings((prev) => ({ ...prev, ...newSettings }));
   };
 
+  // Explicit action to confirm changes and apply them to preview
+  const handleApplyPreview = () => {
+    setPreviewMarkdown(editorMarkdown);
+    showToast('התצוגה המקדימה עודכנה בהצלחה.');
+  };
+
   const handleAutoClean = () => {
-    const cleaned = autoCleanMarkdown(markdown);
-    if (cleaned !== markdown) {
-      setMarkdown(cleaned);
+    const cleaned = autoCleanMarkdown(editorMarkdown);
+    if (cleaned !== editorMarkdown) {
+      setEditorMarkdown(cleaned);
+      setPreviewMarkdown(cleaned); // sync preview immediately
       showToast('בוצע ניקוי: הוסרו משפטי פתיחה של AI, נמחקו הערות מתרגם והומרו הדגשות.', 4000);
     } else {
       showToast('הטקסט כבר נקי ותקין – לא נמצאו תווים לתיקון.', 4000);
@@ -115,13 +137,15 @@ export default function App() {
   };
 
   const handleLoadSample = (sampleText: string) => {
-    setMarkdown(sampleText);
+    setEditorMarkdown(sampleText);
+    setPreviewMarkdown(sampleText); // sync preview immediately
     showToast('נטענה דוגמה רשמית של IFRS 8 מגזרי פעילות.');
   };
 
   // 2-Step Clear handler without window.confirm (which gets blocked in iframe)
   const handleClear = () => {
-    setMarkdown('');
+    setEditorMarkdown('');
+    setPreviewMarkdown(''); // sync preview immediately
     try {
       localStorage.removeItem(STORAGE_KEY_MARKDOWN);
     } catch {
@@ -245,11 +269,15 @@ export default function App() {
           }`}
         >
           <MarkdownEditor
-            value={markdown}
-            onChange={setMarkdown}
+            value={editorMarkdown}
+            onChange={setEditorMarkdown}
             onAutoClean={handleAutoClean}
             onLoadSample={handleLoadSample}
             onClear={handleClear}
+            hasPendingChanges={hasPendingChanges}
+            onApplyPreview={handleApplyPreview}
+            autoSync={autoSync}
+            onToggleAutoSync={() => setAutoSync(!autoSync)}
             onNotify={(msg) => showToast(msg, 4000)}
           />
         </section>
@@ -263,7 +291,9 @@ export default function App() {
           <DocumentPreview
             blocks={blocks}
             settings={settings}
-            rawMarkdown={markdown}
+            rawMarkdown={previewMarkdown}
+            hasPendingChanges={hasPendingChanges}
+            onApplyPreview={handleApplyPreview}
           />
         </section>
       </main>

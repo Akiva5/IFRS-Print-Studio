@@ -10,6 +10,8 @@ interface DocumentPreviewProps {
   blocks: DocumentBlock[];
   settings: DocumentSettings;
   rawMarkdown: string;
+  hasPendingChanges?: boolean;
+  onApplyPreview?: () => void;
 }
 
 type ZoomMode = 'fit-width' | 'fit-page' | '100' | 'manual';
@@ -18,6 +20,8 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   blocks,
   settings,
   rawMarkdown,
+  hasPendingChanges = false,
+  onApplyPreview,
 }) => {
   // Zoom mode state: default to 'fit-width' (התאמה לרוחב) on initial load!
   const [zoomMode, setZoomMode] = useState<ZoomMode>('fit-width');
@@ -109,6 +113,16 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           <span className="text-[11px] text-slate-400 hidden sm:inline">
             ({pages.length} {pages.length === 1 ? 'עמוד' : 'עמודים'})
           </span>
+          {hasPendingChanges && onApplyPreview && (
+            <button
+              onClick={onApplyPreview}
+              title="יש שינויים שטרם עודכנו בתצוגה - לחץ לעדכון כעת (Ctrl+Enter)"
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-medium hover:bg-amber-500/30 transition animate-pulse"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <span>שינויים ממתינים לעדכון (לחץ כאן)</span>
+            </button>
+          )}
         </div>
 
         {/* Zoom Controls: Fit Width, Fit Page, 100%, and - / + Steppers */}

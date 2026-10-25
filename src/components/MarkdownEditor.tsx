@@ -1,18 +1,26 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Sparkles,
   Trash2,
-  FileSpreadsheet,
   Copy,
   Check,
-  RotateCcw,
   BookOpen,
-  Wand2,
   HelpCircle,
   ClipboardPaste,
-  X
+  X,
+  Undo2,
+  Redo2,
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import { SAMPLE_IFRS8_MARKDOWN } from '../utils/sampleData';
+import {
+  HistoryState,
+  createHistory,
+  pushHistory,
+  undoHistory,
+  redoHistory,
+} from '../utils/historyManager';
 
 interface MarkdownEditorProps {
   value: string;
@@ -20,7 +28,10 @@ interface MarkdownEditorProps {
   onAutoClean: () => void;
   onLoadSample: (sample: string) => void;
   onClear: () => void;
-  hasAutoCleanNotice?: boolean;
+  hasPendingChanges?: boolean;
+  onApplyPreview?: () => void;
+  autoSync?: boolean;
+  onToggleAutoSync?: () => void;
   onNotify?: (msg: string) => void;
 }
 
@@ -30,7 +41,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   onAutoClean,
   onLoadSample,
   onClear,
-  hasAutoCleanNotice,
+  hasPendingChanges = false,
+  onApplyPreview,
+  autoSync = false,
+  onToggleAutoSync,
   onNotify,
 }) => {
   const [copied, setCopied] = useState(false);
@@ -40,6 +54,67 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const clearTimerRef = useRef<NodeJS.Timeout | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Undo / Redo History Stack
+  const [history, setHistory] = useState<HistoryState<string>>(() => createHistory(value));
+  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync external changes (like loading sample or auto-clean) into history
+  useEffect(() => {
+    if (value !== history.present) {
+      setHistory((prev) => pushHistory(prev, value));
+    }
+  }, [value]);
+
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
+
+  const handleUndo = () => {
+    const nextH = undoHistory(history);
+    if (nextH !== history) {
+      setHistory(nextH);
+      onChange(nextH.present);
+      onNotify?.('בוטל השינוי האחרון (אחורה)');
+    }
+  };
+
+  const handleRedo = () => {
+    const nextH = redoHistory(history);
+    if (nextH !== history) {
+      setHistory(nextH);
+      onChange(nextH.present);
+      onNotify?.('בוצע שוב (קדימה)');
+    }
+  };
+
+  // User typing in textarea: update value and debounce push to history
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newVal = e.target.value;
+    onChange(newVal);
+
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+    typingTimerRef.current = setTimeout(() => {
+      setHistory((prev) => pushHistory(prev, newVal));
+    }, 400);
+  };
+
+  // Keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y / Ctrl+Shift+Z (Redo), Ctrl+Enter (Apply)
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        handleRedo();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        onApplyPreview?.();
+      }
+    }
+  };
+
   // Compute live stats
   const lineCount = value ? value.split('\n').length : 0;
   const wordCount = value.trim() ? value.trim().split(/\s+/).length : 0;
@@ -47,24 +122,21 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const tableCount = (value.match(/^\|(?:\s*:?-+:?\s*\|)+\s*$/gm) || []).length;
 
   const handlePaste = async () => {
-    // Attempt navigator.clipboard.readText() if supported and permitted
     if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
       try {
         const text = await navigator.clipboard.readText();
         if (text) {
           onChange(text);
+          setHistory((prev) => pushHistory(prev, text));
           setShowPasteNotice(false);
           onNotify?.('הטקסט הודבק בהצלחה מלוח הגזירים.');
           return;
         }
       } catch {
-        // Permissions policy blocked readText (standard in sandboxed iframes)
+        // Permissions policy blocked readText in iframe
       }
     }
 
-    // Graceful fallback for iframe permissions policy:
-    // Focus the textarea, select all text so user can immediately press Ctrl+V / Cmd+V,
-    // and show a prominent banner above the editor
     setShowPasteNotice(true);
     if (textareaRef.current) {
       textareaRef.current.focus();
@@ -106,6 +178,60 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           <span className="text-slate-300 font-semibold px-1">
             טקסט מקור (Markdown)
           </span>
+
+          {/* Apply Preview Button (אישור שינויים ועדכון התצוגה המקדימה) */}
+          <button
+            onClick={onApplyPreview}
+            disabled={!hasPendingChanges}
+            title={
+              hasPendingChanges
+                ? 'עדכן את התצוגה המקדימה עם השינויים האחרונים (Ctrl+Enter)'
+                : 'התצוגה המקדימה מעודכנת ומסונכרנת'
+            }
+            className={`flex items-center gap-1.5 px-3 py-1 rounded transition font-medium ${
+              hasPendingChanges
+                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-500/20 animate-pulse'
+                : 'bg-slate-800/80 text-slate-500 border border-slate-700/60 opacity-60 cursor-default'
+            }`}
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${
+                hasPendingChanges ? 'animate-spin-slow text-slate-950' : 'text-slate-500'
+              }`}
+            />
+            <span>{hasPendingChanges ? 'עדכן תצוגה מקדימה' : 'התצוגה מעודכנת'}</span>
+            {hasPendingChanges && (
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+            )}
+          </button>
+
+          {/* Undo / Redo buttons (אחורה / קדימה לתיקון טעויות) */}
+          <div className="flex items-center gap-0.5 bg-slate-950 p-0.5 rounded border border-slate-800">
+            <button
+              onClick={handleUndo}
+              disabled={!canUndo}
+              title="אחורה - בטל שינוי אחרון (Ctrl+Z)"
+              className={`p-1.5 rounded transition ${
+                canUndo
+                  ? 'text-slate-200 hover:text-amber-400 hover:bg-slate-800'
+                  : 'text-slate-600 cursor-not-allowed'
+              }`}
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={!canRedo}
+              title="קדימה - בצע שוב שינוי שבוטל (Ctrl+Y / Ctrl+Shift+Z)"
+              className={`p-1.5 rounded transition ${
+                canRedo
+                  ? 'text-slate-200 hover:text-amber-400 hover:bg-slate-800'
+                  : 'text-slate-600 cursor-not-allowed'
+              }`}
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           <button
             onClick={handlePaste}
@@ -152,6 +278,26 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
         {/* Right Tools (in RTL, visually left) */}
         <div className="flex items-center gap-2">
+          {/* Optional Live Sync toggle */}
+          {onToggleAutoSync && (
+            <button
+              onClick={onToggleAutoSync}
+              title={
+                autoSync
+                  ? 'עדכון חי פעיל (כל מקש מעדכן מיידית את התצוגה) - לחץ למעבר לעדכון ידני'
+                  : 'עדכון ידני פעיל (התצוגה מתעדכנת רק באישור) - לחץ למעבר לעדכון אוטומטי'
+              }
+              className={`flex items-center gap-1 px-2 py-1 rounded transition border ${
+                autoSync
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <Zap className={`w-3 h-3 ${autoSync ? 'text-amber-400 fill-amber-400' : 'text-slate-500'}`} />
+              <span className="text-[11px]">עדכון חי: {autoSync ? 'פעיל' : 'כבוי'}</span>
+            </button>
+          )}
+
           <button
             onClick={() => setShowTips(!showTips)}
             title="כללי תחביר IFRS"
@@ -257,7 +403,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={handleTextareaChange}
+          onKeyDown={handleKeyDown}
           onPaste={() => setShowPasteNotice(false)}
           placeholder={`הדבק כאן את פלט ה-Markdown של תרגום התקן...
 
@@ -296,9 +443,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             </>
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-emerald-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          <span>שמור בזיכרון מקומי</span>
+        <div className="flex items-center gap-3">
+          <span className="hidden sm:inline text-slate-500">
+            Ctrl+Enter לעדכון · Ctrl+Z לאחורה · Ctrl+Y לקדימה
+          </span>
+          <div className="flex items-center gap-1.5 text-emerald-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>שמור בזיכרון מקומי</span>
+          </div>
         </div>
       </div>
     </div>
