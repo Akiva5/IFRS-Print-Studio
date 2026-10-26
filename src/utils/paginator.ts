@@ -16,12 +16,31 @@ export function estimateBlockHeightMm(block: DocumentBlock): number {
     case 'h3':
       return 11;
 
-    case 'hanging_paragraph': {
-      // 44pt (approx 16mm) for code + gap, leaving ~152mm for body.
-      // ~75 Hebrew characters per line.
-      const charCount = block.body.length;
+    case 'toc': {
+      return 12 + block.items.length * 6.0;
+    }
+
+    case 'subparagraph': {
+      const charCount = block.text.length + block.marker.length;
       const lines = Math.max(1, Math.ceil(charCount / 75));
       return lines * 5.8 + 3.0;
+    }
+
+    case 'hanging_paragraph': {
+      let height = 0;
+      if (block.body) {
+        const charCount = block.body.length;
+        const lines = Math.max(1, Math.ceil(charCount / 75));
+        height += lines * 5.8 + 3.0;
+      }
+      if (block.subparagraphs) {
+        block.subparagraphs.forEach((sub) => {
+          const charCount = sub.text.length + sub.marker.length;
+          const lines = Math.max(1, Math.ceil(charCount / 75));
+          height += lines * 5.8 + 2.5;
+        });
+      }
+      return Math.max(height, 8.0);
     }
 
     case 'paragraph': {

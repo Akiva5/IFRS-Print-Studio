@@ -91,11 +91,65 @@ function renderSingleBlock(block: DocumentBlock, settings: DocumentSettings): st
     case 'h3':
       return `<h3 class="section-h3" id="${block.id}">${formatInlineText(block.text)}</h3>\n`;
 
-    case 'hanging_paragraph':
-      if (settings.hangingIndent) {
-        return `<div class="hanging-grid">\n  <div class="hanging-code">${formatInlineText(block.code)}</div>\n  <div class="hanging-body">${formatInlineText(block.body)}</div>\n</div>\n`;
+    case 'toc': {
+      let tocHtml = `<div class="ifrs-toc" style="margin: 14pt 0; padding: 6pt 0; border-top: 1pt solid #000; border-bottom: 1pt solid #000;">\n`;
+      if (block.title) {
+        tocHtml += `  <div style="font-weight: bold; font-size: 11.5pt; margin-bottom: 6pt; text-align: right;">${formatInlineText(block.title)}</div>\n`;
       }
-      return `<p class="standard-paragraph"><strong>${formatInlineText(block.code)}</strong> ${formatInlineText(block.body)}</p>\n`;
+      tocHtml += `  <div style="display: flex; flex-direction: column; gap: 3pt;">\n`;
+      block.items.forEach((item) => {
+        tocHtml += `    <div style="display: flex; align-items: baseline; justify-content: space-between; font-size: 11pt; line-height: 1.4;">\n`;
+        tocHtml += `      <div style="display: flex; align-items: baseline; gap: 6pt;">\n`;
+        if (item.number) {
+          tocHtml += `        <span style="font-weight: bold; min-width: 18pt; text-align: right;">${formatInlineText(item.number)}</span>\n`;
+        }
+        tocHtml += `        <span>${formatInlineText(item.title)}</span>\n`;
+        tocHtml += `      </div>\n`;
+        if (item.page) {
+          tocHtml += `      <span style="font-family: monospace;">${formatInlineText(item.page)}</span>\n`;
+        }
+        tocHtml += `    </div>\n`;
+      });
+      tocHtml += `  </div>\n`;
+      tocHtml += `</div>\n`;
+      return tocHtml;
+    }
+
+    case 'hanging_paragraph': {
+      let out = '';
+      if (settings.hangingIndent) {
+        out += `<div class="hanging-grid">\n`;
+        out += `  <div class="hanging-code">${formatInlineText(block.code)}</div>\n`;
+        out += `  <div class="hanging-body">\n`;
+        if (block.body) {
+          out += `    <div>${formatInlineText(block.body)}</div>\n`;
+        }
+        if (block.subparagraphs && block.subparagraphs.length > 0) {
+          out += `    <div class="subparagraphs-list" style="margin-top: 4pt; display: flex; flex-direction: column; gap: 3pt;">\n`;
+          block.subparagraphs.forEach((sub) => {
+            out += `      <div style="display: flex; align-items: baseline; gap: 6pt;">\n`;
+            out += `        <span style="font-weight: bold; flex-shrink: 0;">${formatInlineText(sub.marker)}</span>\n`;
+            out += `        <span style="text-align: justify; line-height: inherit;">${formatInlineText(sub.text)}</span>\n`;
+            out += `      </div>\n`;
+          });
+          out += `    </div>\n`;
+        }
+        out += `  </div>\n`;
+        out += `</div>\n`;
+      } else {
+        out += `<p class="standard-paragraph"><strong>${formatInlineText(block.code)}</strong> ${formatInlineText(block.body)}</p>\n`;
+        if (block.subparagraphs && block.subparagraphs.length > 0) {
+          block.subparagraphs.forEach((sub) => {
+            out += `<p class="standard-paragraph" style="padding-right: 20pt;"><strong>${formatInlineText(sub.marker)}</strong> ${formatInlineText(sub.text)}</p>\n`;
+          });
+        }
+      }
+      return out;
+    }
+
+    case 'subparagraph': {
+      return `<div class="subparagraph" style="display: flex; align-items: baseline; gap: 6pt; margin: 3pt 0 4pt 0; padding-right: 44pt; font-size: inherit; line-height: inherit;">\n  <span style="font-weight: bold; flex-shrink: 0;">${formatInlineText(block.marker)}</span>\n  <span style="text-align: justify;">${formatInlineText(block.text)}</span>\n</div>\n`;
+    }
 
     case 'paragraph':
       return `<p class="standard-paragraph">${formatInlineText(block.text)}</p>\n`;
@@ -117,24 +171,43 @@ function renderSingleBlock(block: DocumentBlock, settings: DocumentSettings): st
 /**
  * Renders document blocks into complete IFRS formatted HTML for printing and preview,
  * paginated into individual A4 sheets with running headers and running footers.
+ * - Header: only standard name, aligned to outside edge (odd = left, even = right)
+ * - Footer: page number only, aligned to outside edge (odd = left, even = right)
  */
 export function renderDocumentToHtml(blocks: DocumentBlock[], settings: DocumentSettings): string {
   const pages = paginateBlocks(blocks, settings);
   if (pages.length === 0) return '';
 
   let html = '';
+  const detectedStandard = (() => {
+    const h1 = blocks.find((b) => b.type === 'h1');
+    if (h1 && 'text' in h1) {
+      const match = h1.text.match(/(?:תקן\s+דיווח\s+כספי\s+בינלאומי|תקן\s+חשבונאות\s+בינלאומי|IFRS|IAS)\s*(\d+)/i);
+      if (match) {
+        const num = match[1];
+        const isIAS = /IAS|תקן\s+חשבונאות\s+בינלאומי/i.test(h1.text);
+        const prefix = isIAS ? 'IAS' : 'IFRS';
+        return `${prefix} ${num} IE`;
+      }
+    }
+    return null;
+  })();
+  const headerText = detectedStandard || settings.runningHeaderRight || settings.runningHeaderLeft || '';
 
   pages.forEach((pageBlocks, pageIdx) => {
+    const pageNumber = pageIdx + 1;
+    const isOdd = pageNumber % 2 === 1;
+    const alignOutside = isOdd ? 'left' : 'right';
+
     const isLast = pageIdx === pages.length - 1;
     const breakStyle = isLast ? 'page-break-after: auto; break-after: auto;' : 'page-break-after: always; break-after: page;';
 
     html += `<div class="a4-page" style="${breakStyle} min-height: 297mm; display: flex; flex-direction: column; padding: ${settings.marginMm}mm 20mm; box-sizing: border-box;">\n`;
 
-    // 1. Running Header on each page
-    if (settings.runningHeaderRight || settings.runningHeaderLeft) {
-      html += `  <div class="running-header">\n`;
-      html += `    <div class="running-header-right">${formatInlineText(settings.runningHeaderRight)}</div>\n`;
-      html += `    <div class="running-header-left">${formatInlineText(settings.runningHeaderLeft)}</div>\n`;
+    // 1. Running Header: only standard name, on outside edge
+    if (headerText) {
+      html += `  <div class="running-header" style="border-bottom: 0.75pt solid #000; padding-bottom: 3pt; margin-bottom: 14pt; font-size: 9.5pt; text-align: ${alignOutside}; font-weight: 500; color: #000;">\n`;
+      html += `    ${formatInlineText(headerText)}\n`;
       html += `  </div>\n`;
     }
 
@@ -145,9 +218,9 @@ export function renderDocumentToHtml(blocks: DocumentBlock[], settings: Document
     });
     html += `  </div>\n`;
 
-    // 3. Running Footer on each page
-    html += `  <div class="running-footer" style="margin-top: auto; padding-top: 3pt; border-top: 0.75pt solid #000; font-size: 9pt; text-align: center; color: #000; display: flex; justify-content: center; align-items: center;">\n`;
-    html += `    <span>עמוד ${pageIdx + 1} מתוך ${pages.length}</span>\n`;
+    // 3. Running Footer: page number only, on outside edge
+    html += `  <div class="running-footer" style="margin-top: auto; padding-top: 3pt; border-top: 0.75pt solid #000; font-size: 9.5pt; text-align: ${alignOutside}; color: #000;">\n`;
+    html += `    <span>${pageNumber}</span>\n`;
     html += `  </div>\n`;
 
     html += `</div>\n`;

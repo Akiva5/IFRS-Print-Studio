@@ -1,15 +1,92 @@
-import { DocumentBlock, ParsedTable } from '../types';
+import { DocumentBlock, ParsedTable, SubparagraphItem, TocItem } from '../types';
 import { parseMarkdownTable } from './tableDetector';
+
+/**
+ * Parses a Table of Contents (תוכן עניינים) either from a single unformatted string
+ * or from consecutive numbered lines.
+ */
+function tryParseToc(
+  currentLine: string,
+  lines: string[],
+  startIndex: number
+): { block: DocumentBlock; nextIndex: number } | null {
+  const isTocHeader = /^#*\s*תוכן\s+(?:העניינים|עניינים)\s*:?/i.test(currentLine);
+  if (!isTocHeader) return null;
+
+  // Case A: The single line itself contains the items concatenated (e.g., "תוכן עניינים 1 שירותי בנייה 2 מרכז מסחרי...")
+  const contentAfterHeader = currentLine.replace(/^#*\s*תוכן\s+(?:העניינים|עניינים)\s*:?\s*/i, '').trim();
+
+  const itemRegex = /(?:^|\s+)(\d+|(?:דוגמה|סעיף)\s+\d+)\s+([^\d\n]+?)(?=\s+\d+|\s+(?:דוגמה|סעיף)\s+\d+|$)/g;
+  const items: TocItem[] = [];
+
+  if (contentAfterHeader) {
+    let match: RegExpExecArray | null;
+    while ((match = itemRegex.exec(contentAfterHeader)) !== null) {
+      const num = match[1].trim();
+      const title = match[2].trim();
+      if (title) {
+        items.push({ number: num, title });
+      }
+    }
+  }
+
+  // If items were found in the header line itself
+  if (items.length >= 2) {
+    return {
+      block: { type: 'toc', title: 'תוכן עניינים', items },
+      nextIndex: startIndex + 1,
+    };
+  }
+
+  // Case B: Subsequent lines contain the items:
+  // e.g.
+  // תוכן עניינים
+  // 1 שירותי בנייה
+  // 2 מרכז מסחרי...
+  let idx = startIndex + 1;
+  const lineItemRegex = /^(\d+|\([א-ת\d]+\)|(?:דוגמה|סעיף)\s+\d+)\.?\s+(.+)$/;
+
+  while (idx < lines.length) {
+    const nextLine = lines[idx].trim();
+    if (!nextLine) {
+      // Empty line - check if more items follow, otherwise finish TOC
+      idx++;
+      if (idx < lines.length && lineItemRegex.test(lines[idx].trim())) {
+        continue;
+      }
+      break;
+    }
+
+    const m = nextLine.match(lineItemRegex);
+    if (m) {
+      items.push({ number: m[1].trim(), title: m[2].trim() });
+      idx++;
+    } else {
+      break;
+    }
+  }
+
+  if (items.length >= 1) {
+    return {
+      block: { type: 'toc', title: 'תוכן עניינים', items },
+      nextIndex: idx,
+    };
+  }
+
+  return null;
+}
 
 /**
  * Parses markdown into IFRS Document Blocks:
  * Handles:
  * - h1 (with official top/bottom borders)
  * - h2, h3
- * - Hanging paragraphs (**IG1**, **IE1**, **BC1**, etc.)
+ * - Table of Contents (תוכן עניינים)
+ * - Hanging paragraphs (**IG1**, **IE1**, **BC1**, etc.) with sub-paragraphs: (א), (ב), (ג)...
+ * - Sub-paragraphs keeping official 11.5pt body formatting
  * - Tables (accounting and decision)
- * - Table Footnotes: (א), (ב), (ג)...
- * - Quotes
+ * - Table Footnotes (only immediately following tables)
+ * - Quotes & Horizontal rules
  * - Standard paragraphs
  */
 export function parseDocument(markdown: string): DocumentBlock[] {
@@ -22,8 +99,8 @@ export function parseDocument(markdown: string): DocumentBlock[] {
   const hangingRegex =
     /^(\*\*(?:IG|IE|BC|AG|IN|B|A)?\d+[A-Za-z]?\*\*|(?:IG|IE|BC|AG|IN|B|A)\d+[A-Za-z]?\.?|\*\*\d+[A-Za-z]?\*\*)\s*(.*)$/i;
 
-  // Regex for footnotes: (א), (ב), (ג), (*), (**), (1), etc.
-  const footnoteRegex = /^(\((?:[א-ת]|\*+|\d+)\))\s*(.*)$/;
+  // Regex for sub-clause markers: (א), (ב), (ג), (*), (**), (1), etc.
+  const subclauseRegex = /^(\((?:[א-תa-zA-Z]|\*+|\d+)\))\s+(.*)$/;
 
   while (i < lines.length) {
     const rawLine = lines[i];
@@ -39,6 +116,14 @@ export function parseDocument(markdown: string): DocumentBlock[] {
     if (/^(\-{3,}|\*{3,}|_{3,})$/.test(line)) {
       blocks.push({ type: 'hr' });
       i++;
+      continue;
+    }
+
+    // Table of Contents (תוכן עניינים)
+    const tocResult = tryParseToc(line, lines, i);
+    if (tocResult) {
+      blocks.push(tocResult.block);
+      i = tocResult.nextIndex;
       continue;
     }
 
@@ -100,38 +185,84 @@ export function parseDocument(markdown: string): DocumentBlock[] {
       continue;
     }
 
-    // Table Footnote (e.g. "(א) הכנסות בין-מגזריות...")
-    const footnoteMatch = line.match(footnoteRegex);
-    if (footnoteMatch) {
-      blocks.push({
-        type: 'footnote',
-        marker: footnoteMatch[1],
-        text: footnoteMatch[2],
-      });
+    // Sub-clause or Footnote detection
+    const subclauseMatch = line.match(subclauseRegex);
+    if (subclauseMatch) {
+      const prevBlock = blocks[blocks.length - 1];
+      const isDirectlyUnderTable = prevBlock && (prevBlock.type === 'table' || prevBlock.type === 'footnote');
+
+      if (isDirectlyUnderTable) {
+        // Table Footnote (e.g. "(א) הכנסות בין-מגזריות מתומחרות...")
+        blocks.push({
+          type: 'footnote',
+          marker: subclauseMatch[1],
+          text: subclauseMatch[2],
+        });
+      } else {
+        // Standard Sub-clause (תת סעיף) keeping 11.5pt body styling
+        blocks.push({
+          type: 'subparagraph',
+          marker: subclauseMatch[1],
+          text: subclauseMatch[2],
+        });
+      }
       i++;
       continue;
     }
 
-    // Hanging paragraph code (e.g. "**IG1** הנחיות אלו מלוות...")
+    // Hanging paragraph code (e.g. "**IE4** ההסדר החוזי בין אי ל-בי קובע בנוסף כי:")
     const hangingMatch = line.match(hangingRegex);
     if (hangingMatch) {
-      let code = hangingMatch[1].replace(/\*\*/g, '').trim();
+      const code = hangingMatch[1].replace(/\*\*/g, '').trim();
       let body = hangingMatch[2] || '';
+      const subparagraphs: SubparagraphItem[] = [];
 
-      // Collect any continuation lines until blank line or new block
       i++;
-      while (i < lines.length && lines[i].trim() !== '') {
-        const nextLine = lines[i].trim();
-        // Stop if next line is a header, table, footnote or another hanging paragraph
+      // Collect continuation lines and any sub-clauses belonging to this hanging paragraph
+      while (i < lines.length) {
+        const nextRaw = lines[i];
+        const nextLine = nextRaw.trim();
+
+        if (nextLine === '') {
+          // Lookahead: if the next non-empty line is a sub-clause (א), keep collecting
+          let lookaheadIdx = i + 1;
+          while (lookaheadIdx < lines.length && lines[lookaheadIdx].trim() === '') {
+            lookaheadIdx++;
+          }
+          if (lookaheadIdx < lines.length && subclauseRegex.test(lines[lookaheadIdx].trim())) {
+            i = lookaheadIdx;
+            continue;
+          }
+          break;
+        }
+
+        // Stop if next line is a header, table, or another hanging paragraph
         if (
           nextLine.startsWith('#') ||
           (nextLine.startsWith('|') && nextLine.endsWith('|')) ||
-          footnoteRegex.test(nextLine) ||
           hangingRegex.test(nextLine)
         ) {
           break;
         }
-        body += ' ' + nextLine;
+
+        // Check if next line is a sub-paragraph like "(א) הזכויות לכל הנכסים..."
+        const subM = nextLine.match(subclauseRegex);
+        if (subM) {
+          subparagraphs.push({
+            marker: subM[1],
+            text: subM[2],
+          });
+          i++;
+          continue;
+        }
+
+        // Otherwise continuation of text
+        if (subparagraphs.length > 0) {
+          // Continuation of the last sub-clause
+          subparagraphs[subparagraphs.length - 1].text += ' ' + nextLine;
+        } else {
+          body += (body ? ' ' : '') + nextLine;
+        }
         i++;
       }
 
@@ -139,6 +270,7 @@ export function parseDocument(markdown: string): DocumentBlock[] {
         type: 'hanging_paragraph',
         code,
         body: body.trim(),
+        subparagraphs: subparagraphs.length > 0 ? subparagraphs : undefined,
       });
       continue;
     }
@@ -151,7 +283,7 @@ export function parseDocument(markdown: string): DocumentBlock[] {
       if (
         nextLine.startsWith('#') ||
         (nextLine.startsWith('|') && nextLine.endsWith('|')) ||
-        footnoteRegex.test(nextLine) ||
+        subclauseRegex.test(nextLine) ||
         hangingRegex.test(nextLine)
       ) {
         break;

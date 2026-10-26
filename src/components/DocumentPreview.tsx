@@ -34,6 +34,21 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     return paginateBlocks(blocks, settings);
   }, [blocks, settings]);
 
+  // Auto-detect standard name from H1 (e.g. 'IFRS 11 IE', 'IFRS 8 IE') if available
+  const detectedStandard = useMemo(() => {
+    const h1 = blocks.find((b) => b.type === 'h1');
+    if (h1 && 'text' in h1) {
+      const match = h1.text.match(/(?:תקן\s+דיווח\s+כספי\s+בינלאומי|תקן\s+חשבונאות\s+בינלאומי|IFRS|IAS)\s*(\d+)/i);
+      if (match) {
+        const num = match[1];
+        const isIAS = /IAS|תקן\s+חשבונאות\s+בינלאומי/i.test(h1.text);
+        const prefix = isIAS ? 'IAS' : 'IFRS';
+        return `${prefix} ${num} IE`;
+      }
+    }
+    return null;
+  }, [blocks]);
+
   // ResizeObserver to calculate exact scale dynamically so A4 is never clipped
   useEffect(() => {
     const el = containerRef.current;
@@ -222,68 +237,74 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             className="mx-auto print-only-target"
           >
             {/* Render each separate A4 Page with Running Header and Running Footer */}
-            {pages.map((pageBlocks, pageIdx) => (
-              <div
-                key={pageIdx}
-                className="bg-white text-black font-david relative flex flex-col"
-                style={{
-                  width: '210mm',
-                  minHeight: '297mm',
-                  paddingTop: `${settings.marginMm}mm`,
-                  paddingBottom: `${settings.marginMm}mm`,
-                  paddingRight: '20mm',
-                  paddingLeft: '20mm',
-                  boxSizing: 'border-box',
-                  fontSize: `${settings.fontSizePt}pt`,
-                  lineHeight: settings.lineHeight,
-                  marginBottom: '28px',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.22)',
-                  border: '1px solid #94a3b8',
-                }}
-                dir="rtl"
-              >
-                {/* Optional Margins Guide Overlay */}
-                {settings.showPageGuides && (
-                  <div
-                    className="pointer-events-none absolute inset-0 border border-dashed border-sky-300/40"
-                    style={{
-                      top: `${settings.marginMm}mm`,
-                      bottom: `${settings.marginMm}mm`,
-                      right: '20mm',
-                      left: '20mm',
-                    }}
-                  />
-                )}
+            {pages.map((pageBlocks, pageIdx) => {
+              const pageNumber = pageIdx + 1;
+              const isOdd = pageNumber % 2 === 1;
+              const outsideAlignClass = isOdd ? 'text-left' : 'text-right';
+              const headerText = detectedStandard || settings.runningHeaderRight || settings.runningHeaderLeft;
 
-                {/* Running Header on every page */}
-                {(settings.runningHeaderRight || settings.runningHeaderLeft) && (
-                  <div className="flex justify-between items-center border-b border-black pb-1 mb-4 text-[9.5pt] select-none shrink-0">
-                    <div className="font-medium text-black">
-                      {settings.runningHeaderRight}
-                    </div>
-                    <div className="font-normal text-black font-david">
-                      {settings.runningHeaderLeft}
-                    </div>
-                  </div>
-                )}
-
-                {/* Page Blocks Content */}
-                <div className="flex-1 space-y-2.5">
-                  {pageBlocks.map((block, bIdx) => (
-                    <BlockRenderer
-                      key={bIdx}
-                      block={block}
-                      settings={settings}
+              return (
+                <div
+                  key={pageIdx}
+                  className="bg-white text-black font-david relative flex flex-col"
+                  style={{
+                    width: '210mm',
+                    minHeight: '297mm',
+                    paddingTop: `${settings.marginMm}mm`,
+                    paddingBottom: `${settings.marginMm}mm`,
+                    paddingRight: '20mm',
+                    paddingLeft: '20mm',
+                    boxSizing: 'border-box',
+                    fontSize: `${settings.fontSizePt}pt`,
+                    lineHeight: settings.lineHeight,
+                    marginBottom: '28px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.22)',
+                    border: '1px solid #94a3b8',
+                  }}
+                  dir="rtl"
+                >
+                  {/* Optional Margins Guide Overlay */}
+                  {settings.showPageGuides && (
+                    <div
+                      className="pointer-events-none absolute inset-0 border border-dashed border-sky-300/40"
+                      style={{
+                        top: `${settings.marginMm}mm`,
+                        bottom: `${settings.marginMm}mm`,
+                        right: '20mm',
+                        left: '20mm',
+                      }}
                     />
-                  ))}
-                </div>
+                  )}
 
-                {/* Running Footer on every page */}
-                <div className="mt-auto pt-2 border-t border-black text-[9pt] flex justify-center items-center select-none shrink-0 text-black">
-                  <span>עמוד {pageIdx + 1} מתוך {pages.length}</span>
+                  {/* Running Header on every page - Outside edge: Odd = left, Even = right */}
+                  {headerText && (
+                    <div
+                      className={`border-b border-black pb-1 mb-4 text-[9.5pt] font-medium text-black select-none shrink-0 ${outsideAlignClass}`}
+                    >
+                      <span>{headerText}</span>
+                    </div>
+                  )}
+
+                  {/* Page Blocks Content */}
+                  <div className="flex-1 space-y-2.5">
+                    {pageBlocks.map((block, bIdx) => (
+                      <BlockRenderer
+                        key={bIdx}
+                        block={block}
+                        settings={settings}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Running Footer on every page - Outside edge: Odd = left, Even = right (page number only) */}
+                  <div
+                    className={`mt-auto pt-2 border-t border-black text-[9.5pt] font-david select-none shrink-0 text-black ${outsideAlignClass}`}
+                  >
+                    <span>{pageNumber}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -328,27 +349,86 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block, settings }) => {
         </h3>
       );
 
-    case 'hanging_paragraph':
-      if (settings.hangingIndent) {
-        return (
-          <div
-            className="grid gap-2 mb-2 text-justify"
-            style={{ gridTemplateColumns: '44pt 1fr' }}
-          >
-            <div className="font-bold text-right select-none whitespace-nowrap">
-              {block.code}
-            </div>
-            <div className="text-justify leading-relaxed">
-              {renderFormattedInline(block.body)}
-            </div>
-          </div>
-        );
-      }
+    case 'toc':
       return (
-        <p className="text-justify mb-2 leading-relaxed">
-          <strong className="font-bold ml-1.5">{block.code}</strong>
-          {renderFormattedInline(block.body)}
-        </p>
+        <div className="my-3 py-2 border-t-[1.2pt] border-b-[1.2pt] border-black">
+          {block.title && (
+            <div className="font-bold text-[12pt] mb-2 text-right">
+              {renderFormattedInline(block.title)}
+            </div>
+          )}
+          <div className="space-y-1">
+            {block.items.map((item, idx) => (
+              <div key={idx} className="flex justify-between items-baseline text-[11pt]">
+                <div className="flex items-baseline gap-2 text-right">
+                  <span className="font-bold min-w-[28pt] select-none">{item.number}</span>
+                  <span>{renderFormattedInline(item.title)}</span>
+                </div>
+                {item.page && (
+                  <span className="font-bold text-slate-800 select-none mr-2">{item.page}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+    case 'hanging_paragraph':
+      return (
+        <div className="mb-2">
+          {settings.hangingIndent ? (
+            <div
+              className="grid gap-2 text-justify"
+              style={{ gridTemplateColumns: '44pt 1fr' }}
+            >
+              <div className="font-bold text-right select-none whitespace-nowrap">
+                {block.code}
+              </div>
+              <div className="text-justify leading-relaxed">
+                {renderFormattedInline(block.body)}
+              </div>
+            </div>
+          ) : (
+            <p className="text-justify leading-relaxed">
+              <strong className="font-bold ml-1.5">{block.code}</strong>
+              {renderFormattedInline(block.body)}
+            </p>
+          )}
+
+          {block.subparagraphs && block.subparagraphs.length > 0 && (
+            <div className="mt-1 space-y-1 mr-6">
+              {block.subparagraphs.map((sub, sIdx) => (
+                <div
+                  key={sIdx}
+                  className="grid gap-2 text-justify"
+                  style={{ gridTemplateColumns: '24pt 1fr' }}
+                >
+                  <div className="font-bold text-right select-none whitespace-nowrap">
+                    {sub.marker}
+                  </div>
+                  <div className="text-justify leading-relaxed">
+                    {renderFormattedInline(sub.text)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+
+    case 'subparagraph':
+      return (
+        <div
+          className="grid gap-2 mb-1.5 text-justify mr-6"
+          style={{ gridTemplateColumns: '24pt 1fr' }}
+        >
+          <div className="font-bold text-right select-none whitespace-nowrap">
+            {block.marker}
+          </div>
+          <div className="text-justify leading-relaxed">
+            {renderFormattedInline(block.text)}
+          </div>
+        </div>
       );
 
     case 'paragraph':

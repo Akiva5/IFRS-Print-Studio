@@ -38,11 +38,29 @@ export interface ParsedTable {
   caption?: string;
 }
 
+export interface TocItem {
+  number?: string;
+  title: string;
+  page?: string;
+}
+
+export interface SubparagraphItem {
+  marker: string; // e.g. '(א)', '(ב)', '(1)'
+  text: string;
+}
+
 export type DocumentBlock =
   | { type: 'h1'; text: string; id: string }
   | { type: 'h2'; text: string; id: string }
   | { type: 'h3'; text: string; id: string }
-  | { type: 'hanging_paragraph'; code: string; body: string }
+  | {
+      type: 'hanging_paragraph';
+      code: string;
+      body: string;
+      subparagraphs?: SubparagraphItem[];
+    }
+  | { type: 'subparagraph'; marker: string; text: string }
+  | { type: 'toc'; title?: string; items: TocItem[] }
   | { type: 'paragraph'; text: string }
   | { type: 'table'; table: ParsedTable }
   | { type: 'footnote'; marker: string; text: string }

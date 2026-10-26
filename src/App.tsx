@@ -17,8 +17,8 @@ const STORAGE_KEY_MARKDOWN = 'ifrs_markdown_content_v3';
 const STORAGE_KEY_SETTINGS = 'ifrs_settings_v2';
 
 const DEFAULT_SETTINGS: DocumentSettings = {
-  runningHeaderRight: 'IFRS 8 - מגזרי פעילות: הנחיות יישום ודוגמאות להמחשה',
-  runningHeaderLeft: 'תקינה חשבונאית בינלאומית (IFRS)',
+  runningHeaderRight: 'IFRS 8 IE',
+  runningHeaderLeft: '',
   hangingIndent: true,
   fontSizePt: 11.5,
   lineHeight: 1.48,

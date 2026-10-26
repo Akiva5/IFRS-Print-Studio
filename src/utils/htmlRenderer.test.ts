@@ -38,5 +38,7 @@ test('renderDocumentToHtml renders running header, h1 title, hanging grid and ac
   assert.ok(html.includes('class="summary-row"'));
   assert.ok(html.includes('class="table-footnote"'));
   assert.ok(html.includes('class="running-footer"'));
-  assert.ok(html.includes('עמוד 1 מתוך 1'));
+  // Page number only, outside edge aligned (odd = left)
+  assert.ok(html.includes('<span>1</span>'));
+  assert.ok(html.includes('text-align: left'));
 });
