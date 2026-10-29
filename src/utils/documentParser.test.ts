@@ -40,8 +40,8 @@ test('parseDocument parses h1, hanging paragraphs with subparagraphs, and table 
   }
 });
 
-test('parseDocument parses Table of Contents into structured TOC block', () => {
-  const doc = `תוכן עניינים 1 שירותי בנייה 2 מרכז מסחרי 3 ייצור מוצר`;
+test('parseDocument parses Table of Contents into structured TOC block even with bold asterisks and colons', () => {
+  const doc = `**תוכן עניינים:** 1 שירותי בנייה 2 מרכז מסחרי 3 ייצור מוצר`;
   const blocks = parseDocument(doc);
   assert.equal(blocks.length, 1);
   assert.equal(blocks[0].type, 'toc');

@@ -202,7 +202,7 @@ export function renderDocumentToHtml(blocks: DocumentBlock[], settings: Document
     const isLast = pageIdx === pages.length - 1;
     const breakStyle = isLast ? 'page-break-after: auto; break-after: auto;' : 'page-break-after: always; break-after: page;';
 
-    html += `<div class="a4-page" style="${breakStyle} min-height: 297mm; display: flex; flex-direction: column; padding: ${settings.marginMm}mm 20mm; box-sizing: border-box;">\n`;
+    html += `<div class="a4-page" style="${breakStyle} width: 210mm; height: 296.5mm; margin: 0 !important; padding: ${settings.marginMm}mm 20mm; box-sizing: border-box; box-shadow: none; border: none; page-break-inside: avoid; break-inside: avoid; overflow: hidden; position: relative;">\n`;
 
     // 1. Running Header: only standard name, on outside edge
     if (headerText) {
@@ -212,14 +212,14 @@ export function renderDocumentToHtml(blocks: DocumentBlock[], settings: Document
     }
 
     // 2. Page Content
-    html += `  <div class="page-content" style="flex: 1 0 auto;">\n`;
+    html += `  <div class="page-content" style="box-sizing: border-box;">\n`;
     pageBlocks.forEach((block) => {
       html += '    ' + renderSingleBlock(block, settings);
     });
     html += `  </div>\n`;
 
-    // 3. Running Footer: page number only, on outside edge
-    html += `  <div class="running-footer" style="margin-top: auto; padding-top: 3pt; border-top: 0.75pt solid #000; font-size: 9.5pt; text-align: ${alignOutside}; color: #000;">\n`;
+    // 3. Running Footer: page number only, anchored on outside edge at bottom
+    html += `  <div class="running-footer" style="position: absolute; bottom: ${settings.marginMm}mm; right: 20mm; left: 20mm; width: calc(100% - 40mm); padding-top: 3pt; border-top: 0.75pt solid #000; font-size: 9.5pt; text-align: ${alignOutside}; color: #000; box-sizing: border-box;">\n`;
     html += `    <span>${pageNumber}</span>\n`;
     html += `  </div>\n`;
 

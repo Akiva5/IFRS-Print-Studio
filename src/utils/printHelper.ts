@@ -1,8 +1,8 @@
 import { DocumentSettings } from '../types';
 
 /**
- * Generates the clean print HTML document and opens it in a dedicated popup window
- * to bypass iframe sandbox restrictions and deliver pixel-perfect A4 printing.
+ * Generates a sterile, isolated print HTML document and opens it in a dedicated popup window
+ * to deliver pixel-perfect, 1:1 A4 printing with zero browser margin conflicts or phantom pages.
  */
 export function printViaPopup(contentHtml: string, settings: DocumentSettings, title: string = 'IFRS Print Studio'): boolean {
   try {
@@ -21,9 +21,10 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=David+Libre:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
+    /* 1. Complete reset of page margins to prevent browser default margins */
     @page {
-      size: ${settings.paperSize === 'Letter' ? 'letter portrait' : 'A4 portrait'};
-      margin: ${settings.marginMm}mm 20mm;
+      size: A4 portrait;
+      margin: 0 !important;
     }
 
     * {
@@ -32,11 +33,12 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       print-color-adjust: exact !important;
     }
 
+    /* 2. Sterile body and root elements - absolutely no app styles or dark backgrounds */
     html, body {
-      margin: 0;
-      padding: 0;
-      background: #ffffff;
-      color: #000000;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #ffffff !important;
+      color: #000000 !important;
       direction: rtl;
       text-align: right;
       font-family: 'David Libre', 'David', 'Times New Roman', serif;
@@ -44,68 +46,56 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       line-height: ${settings.lineHeight};
     }
 
-    .print-container {
-      width: 100%;
-      margin: 0 auto;
+    /* 3. Safe A4 Page Container: exactly 210mm x 296.5mm to eliminate pixel-rounding spillovers */
+    .a4-page {
+      width: 210mm !important;
+      height: 296.5mm !important; /* 0.5mm deduction prevents browser DPI rounding from triggering a phantom blank page */
+      margin: 0 !important;
+      padding: 18mm 20mm !important;
+      box-sizing: border-box !important;
+      page-break-after: always !important;
+      break-after: page !important;
+      position: relative !important;
+      overflow: hidden !important;
+      background: #ffffff !important;
+      box-shadow: none !important;
+      border: none !important;
     }
 
-    .print-page {
-      width: 100%;
-      box-sizing: border-box;
-      padding: ${settings.marginMm}mm 20mm;
-      min-height: 297mm;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      page-break-after: always;
-      break-after: page;
-      background: #ffffff;
+    /* 4. Disable page break on the final page */
+    .a4-page:last-child {
+      page-break-after: auto !important;
+      break-after: auto !important;
     }
 
-    .print-page:last-child {
-      page-break-after: auto;
-      break-after: auto;
+    /* 5. Absolutely anchored running footer */
+    .running-footer {
+      position: absolute !important;
+      bottom: 18mm !important;
+      left: 20mm !important;
+      right: 20mm !important;
+      padding-top: 3pt !important;
+      border-top: 0.75pt solid #000000 !important;
+      font-size: 9.5pt !important;
+      color: #000000 !important;
+      box-sizing: border-box !important;
+      background: #ffffff !important;
     }
 
     .page-content {
-      flex: 1;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     /* Running Header */
     .running-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
       border-bottom: 0.75pt solid #000000;
       padding-bottom: 3pt;
       margin-bottom: 14pt;
-      font-size: 9pt;
-      color: #000000;
-    }
-
-    .running-header-right {
+      font-size: 9.5pt;
       font-weight: 500;
-    }
-
-    .running-header-left {
-      font-weight: 400;
-      direction: ltr;
-    }
-
-    /* Running Footer */
-    .running-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-top: 0.75pt solid #000000;
-      padding-top: 3pt;
-      margin-top: 14pt;
-      font-size: 8.5pt;
       color: #000000;
-    }
-
-    .running-footer-center {
-      font-weight: bold;
+      box-sizing: border-box;
     }
 
     /* Standard h1 framed title */
@@ -140,6 +130,14 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       text-align: right;
     }
 
+    /* Table of Contents */
+    .ifrs-toc {
+      margin: 14pt 0;
+      padding: 6pt 0;
+      border-top: 1pt solid #000000;
+      border-bottom: 1pt solid #000000;
+    }
+
     /* Hanging Paragraph Grid */
     .hanging-grid {
       display: grid;
@@ -159,6 +157,17 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
 
     .hanging-body {
       text-align: justify;
+    }
+
+    /* Subparagraph */
+    .subparagraph {
+      display: flex;
+      align-items: baseline;
+      gap: 6pt;
+      margin: 3pt 0 4pt 0;
+      padding-right: 44pt;
+      font-size: inherit;
+      line-height: inherit;
     }
 
     /* Standard Paragraph */
@@ -201,7 +210,6 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       break-inside: avoid;
     }
 
-    /* Accounting Table Header */
     table.ifrs-table.table-accounting thead th {
       border-top: 1.2pt solid #000000;
       border-bottom: 0.75pt solid #000000;
@@ -219,7 +227,6 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       vertical-align: middle;
     }
 
-    /* Unit Row (י"מ) */
     table.ifrs-table tr.unit-row td {
       border-bottom: 0.75pt solid #000000;
       padding-top: 2pt;
@@ -228,7 +235,6 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       text-align: center;
     }
 
-    /* Section Subheader */
     table.ifrs-table tr.subheader-row td:first-child {
       font-weight: bold;
       text-align: right;
@@ -236,7 +242,6 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       padding-bottom: 2pt;
     }
 
-    /* Accounting Summary / Total Row */
     table.ifrs-table tr.summary-row td {
       border-top: 0.75pt solid #000000 !important;
       border-bottom: 3px double #000000 !important;
@@ -245,7 +250,6 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       padding-bottom: 4pt;
     }
 
-    /* Decision Table (Full Grid) */
     table.ifrs-table.table-decision {
       border: 0.5pt solid #000000;
     }
@@ -266,7 +270,6 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       text-align: right;
     }
 
-    /* Numeric cells */
     .num-cell {
       direction: ltr !important;
       display: inline-block;
@@ -286,7 +289,6 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       text-align: left !important;
     }
 
-    /* Blockquote */
     .ifrs-quote {
       border-right: 2pt solid #000000;
       padding-right: 10pt;
@@ -299,26 +301,10 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
       border-top: 0.5pt solid #000000;
       margin: 14pt 0;
     }
-
-    @media screen {
-      body {
-        background: #f1f5f9;
-        padding: 20px;
-      }
-      .print-container {
-        background: #ffffff;
-        max-width: 210mm;
-        min-height: 297mm;
-        padding: ${settings.marginMm}mm 20mm;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-      }
-    }
   </style>
 </head>
 <body>
-  <div class="print-container">
-    ${contentHtml}
-  </div>
+  ${contentHtml}
 
   <script>
     window.addEventListener('load', () => {
@@ -327,13 +313,13 @@ export function printViaPopup(contentHtml: string, settings: DocumentSettings, t
           setTimeout(() => {
             window.focus();
             window.print();
-          }, 300);
+          }, 250);
         });
       } else {
         setTimeout(() => {
           window.focus();
           window.print();
-        }, 500);
+        }, 300);
       }
     });
   </script>

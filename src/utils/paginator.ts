@@ -6,78 +6,89 @@ import { DocumentBlock, DocumentSettings } from '../types';
  */
 export function estimateBlockHeightMm(block: DocumentBlock): number {
   switch (block.type) {
-    case 'h1':
+    case 'h1': {
       // Title with top and bottom 1.5pt black rules, padding and margins
-      return 24;
+      const lines = Math.max(1, Math.ceil(block.text.length / 42));
+      return 16 + lines * 7.5;
+    }
 
-    case 'h2':
-      return 15;
+    case 'h2': {
+      const lines = Math.max(1, Math.ceil(block.text.length / 45));
+      return 10 + lines * 6.5;
+    }
 
-    case 'h3':
-      return 11;
+    case 'h3': {
+      const lines = Math.max(1, Math.ceil(block.text.length / 50));
+      return 8 + lines * 6.0;
+    }
 
     case 'toc': {
-      return 12 + block.items.length * 6.0;
+      let height = 14;
+      block.items.forEach((item) => {
+        const lines = Math.max(1, Math.ceil(item.title.length / 45));
+        height += lines * 5.5 + 2.5;
+      });
+      return height;
     }
 
     case 'subparagraph': {
       const charCount = block.text.length + block.marker.length;
-      const lines = Math.max(1, Math.ceil(charCount / 75));
-      return lines * 5.8 + 3.0;
+      const lines = Math.max(1, Math.ceil(charCount / 54));
+      return lines * 6.2 + 3.5;
     }
 
     case 'hanging_paragraph': {
       let height = 0;
       if (block.body) {
         const charCount = block.body.length;
-        const lines = Math.max(1, Math.ceil(charCount / 75));
-        height += lines * 5.8 + 3.0;
+        const lines = Math.max(1, Math.ceil(charCount / 62));
+        height += lines * 6.2 + 3.5;
       }
-      if (block.subparagraphs) {
+      if (block.subparagraphs && block.subparagraphs.length > 0) {
         block.subparagraphs.forEach((sub) => {
           const charCount = sub.text.length + sub.marker.length;
-          const lines = Math.max(1, Math.ceil(charCount / 75));
-          height += lines * 5.8 + 2.5;
+          const lines = Math.max(1, Math.ceil(charCount / 54));
+          height += lines * 6.2 + 3.0;
         });
       }
-      return Math.max(height, 8.0);
+      return Math.max(height + 3.5, 10.0);
     }
 
     case 'paragraph': {
       const charCount = block.text.length;
-      const lines = Math.max(1, Math.ceil(charCount / 85));
-      return lines * 5.8 + 3.0;
+      const lines = Math.max(1, Math.ceil(charCount / 68));
+      return lines * 6.2 + 4.0;
     }
 
     case 'footnote': {
       const charCount = block.text.length + block.marker.length;
-      const lines = Math.max(1, Math.ceil(charCount / 95));
-      return lines * 4.4 + 2.5;
+      const lines = Math.max(1, Math.ceil(charCount / 85));
+      return lines * 4.8 + 3.0;
     }
 
     case 'quote': {
-      const lines = Math.max(1, Math.ceil(block.text.length / 80));
-      return lines * 5.8 + 4.0;
+      const lines = Math.max(1, Math.ceil(block.text.length / 70));
+      return lines * 6.2 + 6.0;
     }
 
     case 'hr':
-      return 6.0;
+      return 8.0;
 
     case 'table': {
       const table = block.table;
-      let height = 10; // thead
+      let height = 12; // thead
       table.rows.forEach((row) => {
         if (row.isUnitRow) {
-          height += 6.5;
-        } else if (row.isSubheader) {
           height += 7.5;
+        } else if (row.isSubheader) {
+          height += 9.0;
         } else {
           const maxCellLen = Math.max(...row.cells.map((c) => c.text.length), 0);
-          const cellLines = Math.max(1, Math.ceil(maxCellLen / 36));
-          height += cellLines * 6.5;
+          const cellLines = Math.max(1, Math.ceil(maxCellLen / 30));
+          height += cellLines * 7.5;
         }
       });
-      height += 7.0; // table margin
+      height += 8.0; // table margin
       return height;
     }
   }
@@ -85,8 +96,8 @@ export function estimateBlockHeightMm(block: DocumentBlock): number {
 
 /**
  * Paginates document blocks into separate A4 pages.
- * Fills each page up to its genuine printable capacity (~245mm net content)
- * without premature page breaks at headings.
+ * Fills each page up to its genuine printable capacity (~236mm net content)
+ * without premature breaks or orphaned section headings.
  */
 export function paginateBlocks(
   blocks: DocumentBlock[],
@@ -94,8 +105,10 @@ export function paginateBlocks(
 ): DocumentBlock[][] {
   if (blocks.length === 0) return [];
 
-  // Net printable height: A4 total 297mm - 18mm top margin - 18mm bottom margin - header/footer overhead (~16mm)
-  const MAX_PAGE_CONTENT_MM = 245;
+  // Net printable height: A4 total 297mm - 2*18mm margins - ~20mm header/footer overhead
+  // Leaves 241mm max capacity. We budget 236mm to ensure comfortable 1:1 single-page fit.
+  const marginMm = settings?.marginMm ?? 18;
+  const MAX_PAGE_CONTENT_MM = Math.max(180, 272 - (marginMm * 2));
 
   const pages: DocumentBlock[][] = [];
   let currentPage: DocumentBlock[] = [];
@@ -106,11 +119,20 @@ export function paginateBlocks(
     const blockHeight = estimateBlockHeightMm(block);
 
     // If adding this block exceeds page capacity, start a new page
-    // (Ensure at least 1 block per page)
     if (currentPage.length > 0 && currentHeightMm + blockHeight > MAX_PAGE_CONTENT_MM) {
-      pages.push(currentPage);
-      currentPage = [block];
-      currentHeightMm = blockHeight;
+      // Prevent orphan headings: if the last element on current page is an h1, h2, or h3,
+      // move it to the beginning of the new page
+      const lastBlock = currentPage[currentPage.length - 1];
+      if (lastBlock && (lastBlock.type === 'h1' || lastBlock.type === 'h2' || lastBlock.type === 'h3')) {
+        currentPage.pop();
+        pages.push(currentPage);
+        currentPage = [lastBlock, block];
+        currentHeightMm = estimateBlockHeightMm(lastBlock) + blockHeight;
+      } else {
+        pages.push(currentPage);
+        currentPage = [block];
+        currentHeightMm = blockHeight;
+      }
     } else {
       currentPage.push(block);
       currentHeightMm += blockHeight;

@@ -161,6 +161,8 @@ export default function App() {
     if (!success) {
       showToast('חלון ההדפסה נחסם על-ידי הדפדפן. מפעיל הדפסה מקומית במקום...');
       window.print();
+    } else {
+      showToast('נפתח חלון הדפסה נקי. טיפ: ודא שבחלון ההדפסה האפשרות "Background graphics" אינה מסומנת.', 5000);
     }
   };
 
@@ -176,16 +178,20 @@ export default function App() {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=David+Libre:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    @page { size: A4 portrait; margin: ${settings.marginMm}mm 20mm; }
-    body { font-family: 'David Libre', 'David', serif; font-size: ${settings.fontSizePt}pt; line-height: ${settings.lineHeight}; color: #000; background: #fff; text-align: justify; direction: rtl; }
-    .running-header { display: flex; justify-content: space-between; border-bottom: 0.75pt solid #000; padding-bottom: 3pt; margin-bottom: 16pt; font-size: 9pt; }
+    @page { size: A4 portrait; margin: 0 !important; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    html, body { margin: 0 !important; padding: 0 !important; font-family: 'David Libre', 'David', serif; font-size: ${settings.fontSizePt}pt; line-height: ${settings.lineHeight}; color: #000; background: #fff; text-align: justify; direction: rtl; }
+    .a4-page { width: 210mm !important; height: 296.5mm !important; margin: 0 !important; padding: ${settings.marginMm}mm 20mm !important; box-sizing: border-box !important; box-shadow: none !important; border: none !important; page-break-after: always !important; break-after: page !important; page-break-inside: avoid !important; break-inside: avoid !important; overflow: hidden !important; position: relative !important; background: #ffffff !important; }
+    .a4-page:last-child { page-break-after: auto !important; break-after: auto !important; }
+    .running-header { border-bottom: 0.75pt solid #000; padding-bottom: 3pt; margin-bottom: 14pt; font-size: 9.5pt; font-weight: 500; color: #000; box-sizing: border-box; }
+    .running-footer { position: absolute !important; bottom: ${settings.marginMm}mm !important; right: 20mm !important; left: 20mm !important; width: calc(100% - 40mm) !important; padding-top: 3pt !important; border-top: 0.75pt solid #000 !important; font-size: 9.5pt !important; color: #000 !important; box-sizing: border-box !important; }
     .standard-title { border-top: 1.5pt solid #000; border-bottom: 1.5pt solid #000; font-size: 15.5pt; font-weight: bold; padding: 6pt 0; margin: 14pt 0 16pt 0; text-align: right; }
-    .section-h2 { font-size: 13pt; font-weight: bold; margin: 16pt 0 6pt 0; }
-    .section-h3 { font-size: 11.5pt; font-weight: bold; margin: 12pt 0 4pt 0; }
+    .section-h2 { font-size: 13pt; font-weight: bold; margin: 16pt 0 6pt 0; text-align: right; }
+    .section-h3 { font-size: 11.5pt; font-weight: bold; margin: 12pt 0 4pt 0; text-align: right; }
     .hanging-grid { display: grid; grid-template-columns: 44pt 1fr; gap: 4pt; margin-bottom: 7.5pt; text-align: justify; }
     .hanging-code { font-weight: bold; text-align: right; }
     .hanging-body { text-align: justify; }
-    .table-footnote { font-size: 9.5pt; line-height: 1.35; margin: 3.5pt 0; }
+    .table-footnote { font-size: 9.5pt; line-height: 1.35; margin: 3.5pt 0; display: flex; gap: 6pt; }
     table.ifrs-table { width: 100%; border-collapse: collapse; margin: 12pt 0 8pt 0; font-size: 10pt; }
     table.table-accounting thead th { border-top: 1.2pt solid #000; border-bottom: 0.75pt solid #000; padding: 4.5pt 6pt; font-weight: bold; text-align: center; }
     table.table-accounting thead th:first-child { text-align: right; }
@@ -259,12 +265,12 @@ export default function App() {
 
       {/* Split-Screen Main Workspace (RTL: Column 1 is Right 42%, Column 2 is Left 58%) */}
       <main
-        className="flex-1 grid grid-cols-1 md:grid-cols-[42%_58%] overflow-hidden"
+        className="flex-1 grid grid-cols-1 md:grid-cols-[42%_58%] overflow-hidden workspace"
         dir="rtl"
       >
         {/* Right Pane (Markdown Source Editor - 42% on the RIGHT) */}
         <section
-          className={`w-full h-full overflow-hidden ${
+          className={`w-full h-full overflow-hidden no-print ${
             activeTabMobile === 'editor' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
           }`}
         >
@@ -284,7 +290,7 @@ export default function App() {
 
         {/* Left Pane (Live A4 Preview - 58% on the LEFT) */}
         <section
-          className={`w-full h-full overflow-hidden border-r border-slate-800 ${
+          className={`w-full h-full overflow-hidden border-r border-slate-800 preview-pane ${
             activeTabMobile === 'preview' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
           }`}
         >

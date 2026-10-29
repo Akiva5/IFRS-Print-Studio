@@ -117,9 +117,9 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   const isEmpty = blocks.length === 0;
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 overflow-hidden select-text">
+    <div className="flex flex-col h-full bg-slate-950 overflow-hidden select-text preview-pane">
       {/* Preview Control Bar */}
-      <div className="p-3 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
+      <div className="p-3 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 no-print">
         <div className="flex items-center gap-2">
           <Eye className="w-4 h-4 text-amber-400 shrink-0" />
           <span className="font-semibold text-white">
@@ -246,7 +246,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
               return (
                 <div
                   key={pageIdx}
-                  className="bg-white text-black font-david relative flex flex-col"
+                  className="a4-page bg-white text-black font-david relative flex flex-col"
                   style={{
                     width: '210mm',
                     minHeight: '297mm',
@@ -279,14 +279,14 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                   {/* Running Header on every page - Outside edge: Odd = left, Even = right */}
                   {headerText && (
                     <div
-                      className={`border-b border-black pb-1 mb-4 text-[9.5pt] font-medium text-black select-none shrink-0 ${outsideAlignClass}`}
+                      className={`running-header border-b border-black pb-1 mb-4 text-[9.5pt] font-medium text-black select-none shrink-0 ${outsideAlignClass}`}
                     >
                       <span>{headerText}</span>
                     </div>
                   )}
 
                   {/* Page Blocks Content */}
-                  <div className="flex-1 space-y-2.5">
+                  <div className="page-content flex-1 space-y-2.5">
                     {pageBlocks.map((block, bIdx) => (
                       <BlockRenderer
                         key={bIdx}
@@ -298,7 +298,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
                   {/* Running Footer on every page - Outside edge: Odd = left, Even = right (page number only) */}
                   <div
-                    className={`mt-auto pt-2 border-t border-black text-[9.5pt] font-david select-none shrink-0 text-black ${outsideAlignClass}`}
+                    className={`running-footer mt-auto pt-2 border-t border-black text-[9.5pt] font-david select-none shrink-0 text-black ${outsideAlignClass}`}
                   >
                     <span>{pageNumber}</span>
                   </div>

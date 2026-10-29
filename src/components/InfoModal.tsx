@@ -69,10 +69,10 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
 
           <div className="border border-slate-800 rounded-lg p-3 bg-slate-950">
             <h3 className="font-bold text-amber-400 mb-1 text-sm">
-              5. הדפסה נקייה ל-PDF
+              5. הדפסה נקייה ל-PDF (ללא דפים מיותרים)
             </h3>
             <p className="text-slate-400">
-              כפתור &quot;הדפס / שמור ל-PDF&quot; פותח מסמך A4 מבודד עם הגדרות הדפסה תקניות ומפעיל את דיאלוג ההדפסה של מערכת ההפעלה לשמירה מדויקת ללא עיוותי מסגרת.
+              כפתור &quot;הדפס / שמור ל-PDF&quot; פותח מסמך A4 עצמאי וסטרילי לחלוטין (בגובה מבוקר של 296.5 מ&quot;מ ואיפוס שולי הדפדפן). להשגת מספר עמודים מדויק ללא שום עמוד ריק או רקע אפור, ודא תמיד שבחלון ההדפסה של Chrome האפשרות &quot;Background graphics&quot; (גרפיקת רקע) אינה מסומנת ושוליים (Margins) מוגדרים כברירת מחדל או ללא (None).
             </p>
           </div>
         </div>

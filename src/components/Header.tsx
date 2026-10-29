@@ -121,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Dedicated Print Popup Button - Primary Requirement */}
           <button
             onClick={onPrintPopup}
-            title="פותח חלון הדפסה נקי ומבודד התואם דפי A4 בדיוק מושלם"
+            title="פותח חלון הדפסה נקי ומבודד התואם דפי A4 בדיוק מושלם (ודא ש-Background graphics כבוי)"
             className="flex items-center gap-2 px-4 py-2 rounded font-semibold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-md shadow-amber-500/20 active:scale-95"
           >
             <Printer className="w-4 h-4 text-slate-950" />

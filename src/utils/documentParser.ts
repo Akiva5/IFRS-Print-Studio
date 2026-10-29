@@ -10,11 +10,14 @@ function tryParseToc(
   lines: string[],
   startIndex: number
 ): { block: DocumentBlock; nextIndex: number } | null {
-  const isTocHeader = /^#*\s*תוכן\s+(?:העניינים|עניינים)\s*:?/i.test(currentLine);
+  const isTocHeader = /^(?:#*\s*|\*\*\s*|__\s*)תוכן\s+(?:העניינים|עניינים)\s*(?:\*\*|__)?\s*:?/i.test(currentLine);
   if (!isTocHeader) return null;
 
   // Case A: The single line itself contains the items concatenated (e.g., "תוכן עניינים 1 שירותי בנייה 2 מרכז מסחרי...")
-  const contentAfterHeader = currentLine.replace(/^#*\s*תוכן\s+(?:העניינים|עניינים)\s*:?\s*/i, '').trim();
+  const contentAfterHeader = currentLine
+    .replace(/^(?:#*\s*|\*\*\s*|__\s*)תוכן\s+(?:העניינים|עניינים)\s*(?:\*\*|__)?\s*:?\s*/i, '')
+    .replace(/\*\*/g, '')
+    .trim();
 
   const itemRegex = /(?:^|\s+)(\d+|(?:דוגמה|סעיף)\s+\d+)\s+([^\d\n]+?)(?=\s+\d+|\s+(?:דוגמה|סעיף)\s+\d+|$)/g;
   const items: TocItem[] = [];
