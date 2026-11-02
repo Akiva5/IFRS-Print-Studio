@@ -46,6 +46,34 @@ body {
   border: 0.5pt solid #000000;
 }
 
+/* IFRS Hanging Paragraphs with Absolute Number Positioning (Zero Grid page-break detachment) */
+.ifrs-para {
+  position: relative;
+  padding-right: 48pt;
+  margin-bottom: 8pt;
+  text-align: justify;
+  page-break-inside: auto;
+  break-inside: auto;
+}
+
+.ifrs-para .para-num {
+  position: absolute;
+  right: 0;
+  top: 0;
+  font-weight: bold;
+}
+
+/* Auto-detected Internal Headings */
+.internal-heading {
+  display: block !important;
+  margin-top: 12pt !important;
+  margin-bottom: 6pt !important;
+  font-weight: bold !important;
+  font-size: 11.5pt !important;
+  page-break-after: avoid !important;
+  break-after: avoid !important;
+}
+
 /* Print Media Styles for print and window.print() */
 @media print {
   @page {

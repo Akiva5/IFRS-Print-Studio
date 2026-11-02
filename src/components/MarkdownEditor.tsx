@@ -129,6 +129,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           onChange(text);
           setHistory((prev) => pushHistory(prev, text));
           setShowPasteNotice(false);
+          onApplyPreview?.();
           onNotify?.('הטקסט הודבק בהצלחה מלוח הגזירים.');
           return;
         }

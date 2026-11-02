@@ -1,5 +1,6 @@
 import { DocumentBlock, ParsedTable, SubparagraphItem, TocItem } from '../types';
 import { parseMarkdownTable } from './tableDetector';
+import { isInternalHeading } from './htmlRenderer';
 
 /**
  * Parses a Table of Contents (תוכן עניינים) either from a single unformatted string
@@ -278,6 +279,16 @@ export function parseDocument(markdown: string): DocumentBlock[] {
       continue;
     }
 
+    // Internal Heading line on its own (e.g. "ניתוח", "וריאציה", "הסכם בעלי מניות")
+    if (isInternalHeading(line)) {
+      blocks.push({
+        type: 'paragraph',
+        text: line,
+      });
+      i++;
+      continue;
+    }
+
     // Standard paragraph: accumulate until empty line
     const paraLines: string[] = [line];
     i++;
@@ -287,7 +298,8 @@ export function parseDocument(markdown: string): DocumentBlock[] {
         nextLine.startsWith('#') ||
         (nextLine.startsWith('|') && nextLine.endsWith('|')) ||
         subclauseRegex.test(nextLine) ||
-        hangingRegex.test(nextLine)
+        hangingRegex.test(nextLine) ||
+        isInternalHeading(nextLine)
       ) {
         break;
       }

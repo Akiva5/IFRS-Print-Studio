@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { DocumentBlock, DocumentSettings, ParsedTable, TableRow } from '../types';
 import { paginateBlocks } from '../utils/paginator';
+import { isInternalHeading, formatTocParagraph } from '../utils/htmlRenderer';
 
 interface DocumentPreviewProps {
   blocks: DocumentBlock[];
@@ -76,6 +77,14 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  // Detect whether CSS zoom is supported (true in Chrome/Safari/Edge, false in Firefox)
+  const isZoomSupported = useMemo(() => {
+    if (typeof CSS !== 'undefined' && typeof CSS.supports === 'function') {
+      return CSS.supports('zoom', '1');
+    }
+    return true;
   }, []);
 
   // Compute scale based on zoomMode and measured container dimensions
@@ -228,12 +237,22 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           </div>
         ) : (
           <div
-            style={{
-              zoom: scale,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-            }}
+            style={
+              isZoomSupported
+                ? {
+                    zoom: scale,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                  }
+                : {
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'top center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                  }
+            }
             className="mx-auto print-only-target"
           >
             {/* Render each separate A4 Page with Running Header and Running Footer */}
@@ -377,14 +396,11 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block, settings }) => {
       return (
         <div className="mb-2">
           {settings.hangingIndent ? (
-            <div
-              className="grid gap-2 text-justify"
-              style={{ gridTemplateColumns: '44pt 1fr' }}
-            >
-              <div className="font-bold text-right select-none whitespace-nowrap">
+            <div className="ifrs-para relative pr-[48pt] mb-2 text-justify">
+              <span className="para-num absolute right-0 top-0 font-bold select-none whitespace-nowrap">
                 {block.code}
-              </div>
-              <div className="text-justify leading-relaxed">
+              </span>
+              <div className="para-body text-justify leading-relaxed">
                 {renderFormattedInline(block.body)}
               </div>
             </div>
@@ -396,16 +412,15 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block, settings }) => {
           )}
 
           {block.subparagraphs && block.subparagraphs.length > 0 && (
-            <div className="mt-1 space-y-1 mr-6">
+            <div className="mt-1 space-y-1 pr-[48pt]">
               {block.subparagraphs.map((sub, sIdx) => (
                 <div
                   key={sIdx}
-                  className="grid gap-2 text-justify"
-                  style={{ gridTemplateColumns: '24pt 1fr' }}
+                  className="flex items-baseline gap-2 text-justify"
                 >
-                  <div className="font-bold text-right select-none whitespace-nowrap">
+                  <span className="font-bold select-none whitespace-nowrap shrink-0">
                     {sub.marker}
-                  </div>
+                  </span>
                   <div className="text-justify leading-relaxed">
                     {renderFormattedInline(sub.text)}
                   </div>
@@ -418,25 +433,39 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block, settings }) => {
 
     case 'subparagraph':
       return (
-        <div
-          className="grid gap-2 mb-1.5 text-justify mr-6"
-          style={{ gridTemplateColumns: '24pt 1fr' }}
-        >
-          <div className="font-bold text-right select-none whitespace-nowrap">
+        <div className="flex items-baseline gap-2 mb-1.5 text-justify pr-[48pt]">
+          <span className="font-bold select-none whitespace-nowrap shrink-0">
             {block.marker}
-          </div>
+          </span>
           <div className="text-justify leading-relaxed">
             {renderFormattedInline(block.text)}
           </div>
         </div>
       );
 
-    case 'paragraph':
+    case 'paragraph': {
+      const trimmed = block.text.trim();
+      if (/^(?:#*\s*|\*{0,2})תוכן\s+(?:העניינים|עניינים)/i.test(trimmed)) {
+        return (
+          <div
+            className="my-3 py-2 border-t border-b border-black text-right"
+            dangerouslySetInnerHTML={{ __html: formatTocParagraph(block.text) }}
+          />
+        );
+      }
+      if (isInternalHeading(trimmed)) {
+        return (
+          <strong className="internal-heading block font-bold text-[11.5pt] mt-3 mb-1.5 text-right">
+            {renderFormattedInline(trimmed)}
+          </strong>
+        );
+      }
       return (
         <p className="text-justify mb-2 leading-relaxed">
           {renderFormattedInline(block.text)}
         </p>
       );
+    }
 
     case 'table':
       return <TableView table={block.table} />;

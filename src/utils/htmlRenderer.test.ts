@@ -18,7 +18,7 @@ const testSettings: DocumentSettings = {
   paperSize: 'A4',
 };
 
-test('renderDocumentToHtml renders running header, h1 title, hanging grid and accounting tables', () => {
+test('renderDocumentToHtml renders running header, h1 title, ifrs-para positioning and accounting tables', () => {
   const doc = `# דוגמאות להמחשה
 **IG1** סעיף ראשון.
 
@@ -33,12 +33,40 @@ test('renderDocumentToHtml renders running header, h1 title, hanging grid and ac
 
   assert.ok(html.includes('class="running-header"'));
   assert.ok(html.includes('class="standard-title"'));
-  assert.ok(html.includes('class="hanging-grid"'));
-  assert.ok(html.includes('class="hanging-code"'));
+  assert.ok(html.includes('ifrs-para'));
+  assert.ok(html.includes('para-num'));
   assert.ok(html.includes('class="summary-row"'));
   assert.ok(html.includes('class="table-footnote"'));
   assert.ok(html.includes('class="running-footer"'));
   // Page number only, outside edge aligned (odd = left)
   assert.ok(html.includes('<span>1</span>'));
   assert.ok(html.includes('text-align: left'));
+});
+
+test('renderDocumentToHtml automatically detects internal headings and formats TOC with line breaks', () => {
+  const doc = `# דוגמאות להמחשה
+תוכן עניינים: 1 שירותי בנייה 2 מרכז מסחרי 3 ייצור
+
+ניתוח
+
+ישות א' מחזיקה ב-50% מהמניות.
+
+וריאציה 1
+
+הסכם בעלי מניות`;
+
+  const blocks = parseDocument(doc);
+  const html = renderDocumentToHtml(blocks, testSettings);
+
+  // TOC should contain <br> before numbers 2 and 3, and bold title
+  assert.ok(html.includes('toc-title'));
+  assert.ok(html.includes('תוכן עניינים'));
+  assert.ok(html.includes('<br>2'));
+  assert.ok(html.includes('<br>3'));
+
+  // Internal headings should be rendered with class internal-heading and break-after avoid
+  assert.ok(html.includes('internal-heading'));
+  assert.ok(html.includes('ניתוח'));
+  assert.ok(html.includes('וריאציה 1'));
+  assert.ok(html.includes('הסכם בעלי מניות'));
 });

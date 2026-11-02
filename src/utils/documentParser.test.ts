@@ -55,3 +55,17 @@ test('parseDocument parses Table of Contents into structured TOC block even with
     assert.equal(blocks[0].items[2].title, 'ייצור מוצר');
   }
 });
+
+test('parseDocument isolates internal headings as separate blocks instead of merging into paragraph', () => {
+  const doc = `**IE2** פסקת תיאור.
+
+ניתוח
+טקסט הניתוח כאן הוא ארוך וממשיך.`;
+  const blocks = parseDocument(doc);
+  assert.equal(blocks.length, 3);
+  assert.equal(blocks[0].type, 'hanging_paragraph');
+  assert.equal(blocks[1].type, 'paragraph');
+  assert.equal(blocks[1].text, 'ניתוח');
+  assert.equal(blocks[2].type, 'paragraph');
+  assert.ok(blocks[2].text.includes('טקסט הניתוח כאן'));
+});

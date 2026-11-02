@@ -42,3 +42,23 @@ test('paginateBlocks prevents single-page spillover on multi-example documents l
   assert.ok(p1Blocks.length > 0);
   assert.equal(p1Blocks[0].type, 'h1');
 });
+
+test('paginateBlocks pushes heading to next page when remaining space is under 30mm', () => {
+  // Construct blocks where ~215mm is consumed, leaving < 30mm on page 1
+  const doc = `# דוגמה מרכזית
+**IE1** פסקה ארוכה ראשונה שתמלא שטח ניכר בעמוד הראשון. החברות פועלות יחד בהסכם משותף לביצוע עבודות תשתית ופיתוח עירוני רחב היקף לפי תקן בינלאומי.
+**IE2** פסקה ארוכה שנייה שממשיכה למלא את העמוד הראשון ומבטיחה שיישאר מקום קטן מ-30 מ"מ בסוף העמוד.
+**IE3** פסקה ארוכה שלישית שתופסת שטח נוסף בעמוד כדי להביא את גובה העמוד לרמה שבה נותרו פחות מ-30 מ"מ.
+
+ניתוח
+
+**IE4** פסקה שמתחילה את הניתוח ומפרטת את העקרונות החשבונאיים.`;
+
+  const blocks = parseDocument(doc);
+  const pages = paginateBlocks(blocks);
+
+  // Check where "ניתוח" was placed: it must NOT be an orphan alone at the end of page 1
+  const page1LastBlock = pages[0][pages[0].length - 1];
+  const isLastBlockHeading = page1LastBlock.type === 'paragraph' && /ניתוח/.test(page1LastBlock.text);
+  assert.equal(isLastBlockHeading, false, 'Internal heading "ניתוח" must not be left orphaned at the bottom of page 1');
+});

@@ -33,7 +33,7 @@ export default function App() {
   const [editorMarkdown, setEditorMarkdown] = useState<string>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_MARKDOWN);
-      if (saved !== null && saved !== undefined) {
+      if (saved !== null && saved !== undefined && saved.trim().length > 0) {
         return saved;
       }
     } catch {
@@ -42,9 +42,19 @@ export default function App() {
     return SAMPLE_IFRS8_MARKDOWN;
   });
 
-  // Preview text state (controlled update so typing doesn't flicker/jump preview)
+  // Preview text state (real-time live sync with 150ms debounce)
   const [previewMarkdown, setPreviewMarkdown] = useState<string>(editorMarkdown);
-  const [autoSync, setAutoSync] = useState<boolean>(false);
+  const [autoSync, setAutoSync] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('ifrs_auto_sync_v2');
+      if (saved !== null) {
+        return saved === 'true';
+      }
+    } catch {
+      // ignore
+    }
+    return true; // Live update active by default!
+  });
 
   const hasPendingChanges = editorMarkdown !== previewMarkdown;
 
@@ -81,7 +91,7 @@ export default function App() {
     if (!autoSync) return;
     const timer = setTimeout(() => {
       setPreviewMarkdown(editorMarkdown);
-    }, 350);
+    }, 150);
     return () => clearTimeout(timer);
   }, [editorMarkdown, autoSync]);
 
@@ -123,6 +133,22 @@ export default function App() {
   const handleApplyPreview = () => {
     setPreviewMarkdown(editorMarkdown);
     showToast('התצוגה המקדימה עודכנה בהצלחה.');
+  };
+
+  const handleToggleAutoSync = () => {
+    const nextVal = !autoSync;
+    setAutoSync(nextVal);
+    try {
+      localStorage.setItem('ifrs_auto_sync_v2', String(nextVal));
+    } catch {
+      // ignore
+    }
+    if (nextVal) {
+      setPreviewMarkdown(editorMarkdown);
+      showToast('עדכון חי הופעל - התצוגה מתעדכנת בזמן אמת.');
+    } else {
+      showToast('עדכון ידני הופעל - לחץ על "עדכן תצוגה מקדימה" לאישור שינויים.');
+    }
   };
 
   const handleAutoClean = () => {
@@ -188,6 +214,9 @@ export default function App() {
     .standard-title { border-top: 1.5pt solid #000; border-bottom: 1.5pt solid #000; font-size: 15.5pt; font-weight: bold; padding: 6pt 0; margin: 14pt 0 16pt 0; text-align: right; }
     .section-h2 { font-size: 13pt; font-weight: bold; margin: 16pt 0 6pt 0; text-align: right; }
     .section-h3 { font-size: 11.5pt; font-weight: bold; margin: 12pt 0 4pt 0; text-align: right; }
+    .internal-heading { display: block; margin-top: 12pt; margin-bottom: 6pt; font-weight: bold; font-size: 11.5pt; page-break-after: avoid; break-after: avoid; }
+    .ifrs-para { position: relative; padding-right: 48pt; margin-bottom: 8pt; text-align: justify; page-break-inside: auto; break-inside: auto; }
+    .ifrs-para .para-num { position: absolute; right: 0; top: 0; font-weight: bold; }
     .hanging-grid { display: grid; grid-template-columns: 44pt 1fr; gap: 4pt; margin-bottom: 7.5pt; text-align: justify; }
     .hanging-code { font-weight: bold; text-align: right; }
     .hanging-body { text-align: justify; }
@@ -283,7 +312,7 @@ export default function App() {
             hasPendingChanges={hasPendingChanges}
             onApplyPreview={handleApplyPreview}
             autoSync={autoSync}
-            onToggleAutoSync={() => setAutoSync(!autoSync)}
+            onToggleAutoSync={handleToggleAutoSync}
             onNotify={(msg) => showToast(msg, 4000)}
           />
         </section>
